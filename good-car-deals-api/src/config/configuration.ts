@@ -5,6 +5,7 @@ export interface AppConfig {
     cronSchedule: string;
     brand: string;
     model: string;
+    proxyUrl?: string;
   };
 }
 
@@ -15,5 +16,6 @@ export default (): AppConfig => ({
     cronSchedule: process.env.SCRAPER_CRON_SCHEDULE!,
     brand: process.env.SCRAPER_BRAND!,
     model: process.env.SCRAPER_MODEL!,
+    proxyUrl: process.env.SCRAPER_PROXY_URL,
   },
 });

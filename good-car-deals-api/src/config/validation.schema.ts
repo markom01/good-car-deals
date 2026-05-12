@@ -22,6 +22,9 @@ export class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   SCRAPER_CRON_SCHEDULE!: string;
+
+  @IsString()
+  SCRAPER_PROXY_URL?: string;
 }
 
 export function validate(config: Record<string, unknown>) {
