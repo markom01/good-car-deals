@@ -3,7 +3,9 @@
   "scripts": {
     "dev": "concurrently -n api,frontend -c blue,green \"npm run start:api\" \"npm run dev:frontend\"",
     "start:api": "cd good-car-deals-api && node dist/src/main.js",
-    "dev:frontend": "npm --prefix good-car-deals-frontend run dev"
+    "dev:frontend": "npm --prefix good-car-deals-frontend run dev",
+    "build": "cd good-car-deals-api && npx prisma generate && npm run build",
+    "start": "cd good-car-deals-api && npx prisma db push --accept-data-loss && node dist/src/main.js"
   },
   "workspaces": [
     "packages/*",
@@ -12,7 +14,8 @@
   ],
   "devDependencies": {
     "concurrently": "^9.2.1",
-    "shadcn": "^4.7.0"
+    "shadcn": "^4.7.0",
+    "vercel": "^53.4.0"
   },
   "dependencies": {
     "lodash": "^4.17.21"

@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: good-car-deals-api
+    env: node
+    region: frankfurt
+    plan: free
+    buildCommand: npm install && cd good-car-deals-api && npx prisma generate && npm run build
+    startCommand: cd good-car-deals-api && npx prisma db push --accept-data-loss && node dist/src/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PORT
+        value: "10000"
+      - key: DATABASE_URL
+        sync: false
+      - key: SCRAPER_TARGET_URL
+        sync: false
+      - key: SCRAPER_BRAND
+        sync: false
+      - key: SCRAPER_MODEL
+        sync: false
+      - key: SCRAPER_CRON_SCHEDULE
+        value: "0 0 * * 0"

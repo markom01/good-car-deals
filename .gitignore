@@ -8,3 +8,7 @@ dist/
 __pycache__/
 *.pyc
 .sisyphus/evidence/
+.sisyphus/boulder.json
+.sisyphus/notepads/
+.vercel
+*.py

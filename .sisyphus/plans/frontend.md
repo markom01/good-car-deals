@@ -1078,15 +1078,18 @@ Critical Path: T1 → T2 → T5 → T7 → T8 → F1-F4 → user okay
 
 ## Commit Strategy
 
-- **Task 1**: `chore(api): enable CORS and set port to 3001`
-- **Task 2**: `feat(shared): create shared types package with Listing interface`
-- **Task 3**: `feat(frontend): scaffold Next.js app with shadcn/ui preset`
-- **Task 4**: `feat(frontend): add custom CSS variables for spacing and typography`
-- **Task 5**: `feat(frontend): add React Query provider and use-deals hook`
-- **Task 6**: `feat(frontend): add shadcn components (Badge, Button, Separator, ScrollArea)`
-- **Task 7**: `feat(frontend): create DealCard component`
-- **Task 8**: `feat(frontend): create main page with deal list`
-- **Task 9**: Squash into a final `feat(frontend): complete MVP listing page`
+Actual commits made (monorepo):
+
+| # | Message | Files |
+|---|---------|-------|
+| 1 | `chore: initial commit with gitignore` | `.gitignore` |
+| 2 | `feat(shared): create shared types package with Listing interface` | `package.json`, `packages/shared/` |
+| 3 | `feat(api): add deal scraper with NestJS backend on port 3001 with CORS` | `good-car-deals-api/` |
+| 4 | `feat(frontend): scaffold Next.js app with shadcn/ui preset` | Next.js + shadcn init files, `globals.css`, `layout.tsx` |
+| 5 | `feat(frontend): add shadcn UI components (Badge, Button, Separator, Card)` | `badge.tsx`, `button.tsx`, `separator.tsx`, `card.tsx` |
+| 6 | `feat(frontend): add React Query provider and use-deals hook` | `providers.tsx`, `use-deals.ts` |
+| 7 | `feat(frontend): create main page with deal list and DealCard component` | `page.tsx`, `deal-list.tsx`, `deal-card.tsx`, `index.ts` |
+| 8 | `chore: add plan, frontend gitignore, and lib barrel export` | `frontend.md`, `.gitignore`, `lib/index.ts` |
 
 ---
 
