@@ -1,0 +1,33 @@
+name: Weekly Scrape
+
+on:
+  schedule:
+    # Every Sunday at midnight UTC
+    - cron: "0 0 * * 0"
+  workflow_dispatch: # Manual trigger from GitHub UI
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build API
+        run: npm run build
+
+      - name: Run scraper
+        run: cd good-car-deals-api && node dist/src/main.js --scrape
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SCRAPER_TARGET_URL: ${{ secrets.SCRAPER_TARGET_URL }}
+          SCRAPER_BRAND: ${{ secrets.SCRAPER_BRAND }}
+          SCRAPER_MODEL: ${{ secrets.SCRAPER_MODEL }}
+          SCRAPER_CRON_SCHEDULE: ${{ secrets.SCRAPER_CRON_SCHEDULE }}
