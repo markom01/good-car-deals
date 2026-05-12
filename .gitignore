@@ -1,11 +1,10 @@
 ﻿node_modules/
 .next/
-.env
-.env.local
 dist/
 *.tsbuildinfo
+.env
+.env.local
 .playwright-mcp/
 __pycache__/
 *.pyc
 .sisyphus/evidence/
-data/
