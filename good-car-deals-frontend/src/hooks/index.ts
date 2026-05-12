@@ -1,0 +1,1 @@
+export { useDeals } from './use-deals';
