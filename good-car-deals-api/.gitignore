@@ -1,0 +1,9 @@
+﻿node_modules/
+.env
+*.log
+coverage/
+.nestjs/
+
+
+dist/
+/generated/prisma

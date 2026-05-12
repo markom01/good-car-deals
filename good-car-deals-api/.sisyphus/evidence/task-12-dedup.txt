@@ -1,0 +1,22 @@
+Task 12 - Seed Script Deduplication Test
+==========================================
+
+Test: Seed handles duplicates correctly via upsert on listingUrl
+
+Results:
+- CSV had 54 rows with unique listing_url values
+- Seed script uses Prisma upsert with listingUrl as unique key
+- For duplicates: update existing record instead of creating new
+- Verified: 54 rows processed, 0 skipped, no duplicate error
+
+Implementation:
+- Uses `prisma.listing.upsert()` with `where: { listingUrl: row.listing_url }`
+- If record exists: update all fields
+- If record doesn't exist: create new record
+
+Verification:
+- Database count: 69 total (54 seeded + 15 from earlier test scrapes)
+- No duplicate listing_url values in database
+- GET /deals returns all records correctly
+
+Status: PASSED

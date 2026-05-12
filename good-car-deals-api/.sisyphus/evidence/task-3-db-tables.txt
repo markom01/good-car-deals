@@ -1,0 +1,22 @@
+Task 3 Acceptance Criteria Verification - 2026-05-09
+
+=== AC #1: npx prisma migrate dev runs successfully ===
+Result: ✅ PASS
+  Migration file: prisma/migrations/202605090000_init/migration.sql
+  Migration status: "Database schema is up to date!"
+  SQL creates table "listings" with 14 columns (id, listing_url, title, price, price_numeric, price_note, year, age, mileage_km, model, deal_type, deal_score, price_per_year, scraped_at, updated_at)
+  UNIQUE index on listing_url
+
+=== AC #2: Listing table created in PostgreSQL ===
+Result: ✅ PASS
+  DB connection: PostgreSQL database "good_car_deals" at localhost:5432
+  Table "listings" exists (verified via Prisma $queryRaw)
+  Listing count: 45 records (from previous scrape run)
+
+=== AC #3: Prisma can connect (prisma studio equivalent) ===
+Result: ✅ PASS
+  migrate status: "Datasource 'db': PostgreSQL database 'good_car_deals', schema 'public' at 'localhost:5432'"
+  PrismaClient.$connect() succeeds
+  PrismaClient.listing.count() = 45
+
+=== Verdict: ALL THREE ACCEPTANCE CRITERIA PASS ===

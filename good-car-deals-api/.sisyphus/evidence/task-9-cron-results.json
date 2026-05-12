@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-05-09T14:07:43.099Z",
+  "testType": "Real data E2E test (no mocks)",
+  "results": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5
+  },
+  "details": [
+    "  PASS: Live scrape produces listings - Found 46 unique listings in 23.7s",
+    "  PASS: Save listings to DB - Saved 46 listings to PostgreSQL",
+    "  PASS: No duplicate listing URLs in DB - 48 total, 48 unique URLs",
+    "  PASS: Deal classification runs - Classified 3 listings",
+    "  PASS: Deal types assigned in DB - 3 listings have deal_type set"
+  ]
+}

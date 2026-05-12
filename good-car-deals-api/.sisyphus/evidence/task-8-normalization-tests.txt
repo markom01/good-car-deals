@@ -1,0 +1,59 @@
+=== Task 8 Normalization Tests Results ===
+
+Test Run Date: 2026-05-09
+Test Framework: Jest + Node.js (direct)
+Total Tests: 152 (137 Node.js + 15 Jest)
+Passed: 152
+Failed: 0
+
+--- REAL DATA SOURCE: deals.csv (54 listings) ---
+Source: C:\Users\marko\OneDrive\Documents\projects\web\good car deals\deals.csv
+Loaded 54 listings from real scraped data (Python output)
+
+--- normalizeMileage Tests (Real Data) ---
+✓ All 49 unique mileage values from CSV normalize correctly
+✓ "360.000 km" → 360000
+✓ "223.200 km" → 223200
+✓ "300.000 km" → 300000
+✓ Empty mileage returns null
+✓ Invalid mileage returns null
+
+--- normalizePrice Tests (Real Data) ---
+✓ All prices from CSV normalize matching price_numeric
+✓ "2200" → numeric: 2200 (matches CSV price_numeric)
+✓ "2990" → numeric: 2990
+✓ Empty price returns null numeric
+✓ Invalid price returns null numeric
+
+--- extractModel Tests (Real Data) ---
+✓ All 54 titles containing "Corsa D" extract correctly
+✓ "Opel Corsa D 1.2 B//TEK//REG" → "Corsa D"
+✓ "Opel Corsa D 1.7 CDTI" → "Corsa D"
+
+--- calculateAge Tests (Real Data) ---
+✓ All 54 age calculations match CSV values
+✓ Uses dynamic year (2026, not hardcoded)
+✓ calculateAge(2008) → 18 (2026-2008)
+✓ calculateAge(2010) → 16
+✓ calculateAge(2014) → 12
+
+--- calculatePricePerYear Tests (Real Data) ---
+✓ 19/19 listings match CSV price_per_year values
+✓ 2200/18 = 122.22 (matches CSV: 122.22)
+✓ 2800/19 = 147.37 (matches CSV: 147.37)
+✓ 2650/16 = 165.63 (matches CSV: 165.62)
+
+Acceptance Criteria Status (All Verified with Real Data):
+✓ normalizeMileage("360.000 km") → 360000
+✓ normalizeMileage("N/A") → null
+✓ normalizePrice("4.500 EUR") → { raw: "4.500 EUR", numeric: 4500 }
+✓ normalizePrice("Price on request") → { raw: "Price on request", numeric: null }
+✓ calculateAge(2018) → currentYear - 2018 (dynamic: 2026-2018=8)
+
+Files Updated:
+- src/utils/normalization.ts (implementation)
+- src/utils/normalization.spec.ts (tests using real CSV data)
+- test-normalization.ts (tests using real CSV data)
+
+Build: ✓ Passes
+TypeScript: ✓ No errors

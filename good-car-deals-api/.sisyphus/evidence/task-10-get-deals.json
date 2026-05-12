@@ -1,0 +1,47 @@
+{
+  "testDate": "2026-05-09T18:03:21Z",
+  "endpoint": "GET /deals",
+  "statusCode": 200,
+  "totalDeals": 48,
+  "sortedBy": "pricePerYear ascending",
+  "sampleResponse": [
+    {
+      "title": "Opel Corsa D 1.7 SPORT",
+      "price": "3.999 EUR",
+      "priceNumeric": 3999,
+      "year": 2010,
+      "mileageKm": 190000,
+      "dealType": "DECENT DEAL (Market)",
+      "pricePerYear": 249.94
+    },
+    {
+      "title": "Opel Corsa D",
+      "price": "3.800 EUR",
+      "priceNumeric": 3800,
+      "year": 2014,
+      "mileageKm": 160000,
+      "dealType": "OVERPRICED",
+      "pricePerYear": 316.67
+    },
+    {
+      "title": "Opel Corsa D A U T O M A T I C",
+      "price": "4.750 EUR",
+      "priceNumeric": 4750,
+      "year": 2012,
+      "dealType": "OVERPRICED",
+      "pricePerYear": 339.29
+    }
+  ],
+  "dealTypeDistribution": {
+    "DECENT DEAL (Market)": 1,
+    "OVERPRICED": 2,
+    "null": 45
+  },
+  "verification": {
+    "returnsJsonArray": true,
+    "hasDealTypeField": true,
+    "sortedByPricePerYear": true,
+    "not500Error": true
+  },
+  "notes": "48 deals in DB (some duplicates may have been removed). 45 deals have null dealType - classification service may need to be run."
+}

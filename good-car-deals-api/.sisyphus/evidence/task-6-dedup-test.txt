@@ -1,0 +1,14 @@
+﻿=== QA Test: Deduplication ===
+Input: 3, Unique: 2
+https://test.com/1, https://test.com/2
+Γ£à Deduplication works correctly!
+
+=== QA Test: Mileage Normalization ===
+normalizeMileage("360.000 km") = 360000 Γ£à
+normalizeMileage("50.000 km") = 50000 Γ£à
+
+=== QA Test: Price Normalization ===
+normalizePrice("4.500 EUR") = 4500 Γ£à
+normalizePrice("12.000") = 12000 Γ£à
+
+Γ£à QA Scenarios completed!

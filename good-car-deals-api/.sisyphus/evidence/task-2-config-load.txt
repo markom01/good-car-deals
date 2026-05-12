@@ -1,0 +1,16 @@
+Task 2 Acceptance Criteria Verification - 2026-05-09
+
+=== AC #1: ConfigService.get('database') returns connection string ===
+Result: ✅ PASS
+  database: postgresql://postgres:postgres@localhost:5432/good_car_deals?sslmode=disable
+  scraper.targetUrl: https://www.polovniautomobili.com/auto-oglasi/opel/corsa-d/
+  scraper.cronSchedule: 0 0 * * 0
+  All 3 config values loaded correctly from .env
+
+=== AC #2: Invalid .env throws validation error on startup ===
+Result: ✅ PASS
+  Tested with empty DATABASE_URL, SCRAPER_TARGET_URL, SCRAPER_CRON_SCHEDULE
+  Error thrown: "Environment validation failed: property DATABASE_URL has failed the following constraints: isNotEmpty"
+  All 3 empty fields correctly caught by class-validator decorators
+
+=== Verdict: BOTH ACCEPTANCE CRITERIA PASS ===

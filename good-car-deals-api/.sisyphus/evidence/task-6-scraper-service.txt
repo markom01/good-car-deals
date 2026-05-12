@@ -1,0 +1,25 @@
+Task 6: Scraper Service (Port Python scraper.py)
+===============================================
+Status: COMPLETED
+
+Files created:
+  1. src/scraper/scraper.service.ts - scrapeOpelCorsaD(), saveListings() methods
+
+Verification:
+  - Build: PASSED (npm run build -> exit 0)
+  - Diagnostics: 0 errors
+
+QA Scenario Results (2026-05-09):
+  - Deduplication: ✅ 3 inputs → 2 unique (duplicate URL filtered)
+  - normalizeMileage: ✅ 2/2 tests passed
+    - "360.000 km" → 360000
+    - "50.000 km" → 50000
+  - normalizePrice: ✅ 2/2 tests passed
+    - "4.500 EUR" → 4500
+    - "12.000" → 12000
+
+Notes:
+  - scrapeOpelCorsaD() loops pages 1-15, calls HTTP service, parses HTML
+  - Deduplication via Set by listingUrl before saving
+  - saveListings() uses Prisma upsert on listingUrl conflict
+  - Handles page fetch failures gracefully (log warning, continue)

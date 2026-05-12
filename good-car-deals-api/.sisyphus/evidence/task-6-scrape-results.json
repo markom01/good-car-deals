@@ -1,0 +1,35 @@
+﻿=== QA: Full Scrape + Save to PostgreSQL ===
+
+Step 1: Scraping live site (15 pages)...
+  Page 1: 4 Corsa D listings
+  Page 2: 2 Corsa D listings
+  Page 3: 4 Corsa D listings
+  Page 4: 3 Corsa D listings
+  Page 5: 1 Corsa D listings
+  Page 6: 5 Corsa D listings
+  Page 7: 6 Corsa D listings
+  Page 8: 6 Corsa D listings
+  Page 9: 4 Corsa D listings
+  Page 10: 1 Corsa D listings
+  Page 11: 1 Corsa D listings
+  Page 12: 2 Corsa D listings
+  Page 13: 3 Corsa D listings
+  Page 14: 3 Corsa D listings
+  Page 15: 1 Corsa D listings
+
+Scraped 46 raw listings (0 page errors)
+
+Step 2: Deduplication...
+  46 raw ΓåÆ 45 unique
+  Γ£à Deduplication: PASS
+
+Step 3: Saving to database...
+  Saved: 45, Skipped (errors): 0
+  Total in DB: 45
+  Γ£à Save to DB: PASS
+
+Step 4: Verifying no DB duplicates...
+  Γ£à No duplicates: 45 unique URLs
+
+=== QA Results: 3/3 passed, 0 failed ===
+Γ£à ALL QA SCENARIOS PASSED

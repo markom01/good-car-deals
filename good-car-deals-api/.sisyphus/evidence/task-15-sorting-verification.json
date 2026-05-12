@@ -1,0 +1,23 @@
+Task 15 E2E - Sorting & Field Verification
+==========================================
+
+Date: 2026-05-10
+
+Sorting verification:
+- 69 deals verified sorted by pricePerYear ascending
+- No null values affecting sort order
+
+Field completeness:
+- All 10 required fields present in every deal:
+  1. id (BigInt, serialized to number)
+  2. title (string)
+  3. price (string)
+  4. priceNumeric (number | null)
+  5. year (number | null)
+  6. mileageKm (number | null)
+  7. dealType (string | null)
+  8. dealScore (number | null)
+  9. pricePerYear (number | null)
+  10. listingUrl (string)
+
+VERDICT: PASS

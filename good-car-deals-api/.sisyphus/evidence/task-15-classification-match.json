@@ -1,0 +1,33 @@
+Task 15 E2E Test - Classification Match Results
+==============================================
+
+Date: 2026-05-10
+
+Test: deal_type distribution matches Python deals.csv (≥90% match)
+
+Results:
+- Python deals.csv: 54 rows, 4 deal types
+  - DECENT DEAL (Market): 14 (25.93%)
+  - DECENT DEAL: 1 (1.85%)
+  - GOOD DEAL (Market): 12 (22.22%)
+  - OVERPRICED: 27 (50.00%)
+
+- Real API: 69 listings, 53 classified
+  - DECENT DEAL (Market): 13 (24.53%)
+  - DECENT DEAL: 1 (1.89%)
+  - GOOD DEAL (Market): 12 (22.64%)
+  - OVERPRICED: 27 (50.94%)
+
+Match percentage: 98.60% ✅
+
+All 8 tests passed:
+1. GET /deals returns real listings - 69 listings returned ✅
+2. All required fields present - 10 fields verified ✅
+3. Deals sorted by pricePerYear - ascending order verified ✅
+4. deal_type match ≥90% - 98.60% match ✅
+5. Sufficient real data - 69 listings vs 54 CSV rows ✅
+6. JSON structure correct - all deals valid ✅
+7. Majority classified - 53/69 classified (76.8%) ✅
+8. pricePerYear correct - 122.22 matches formula ✅
+
+VERDICT: PASS

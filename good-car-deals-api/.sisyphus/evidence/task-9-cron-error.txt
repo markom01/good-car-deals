@@ -1,0 +1,28 @@
+=== QA: Cron Job Error Handling ===
+
+Timestamp: 2026-05-09T14:09:00.544Z
+Test type: Real data + code review (no mocks)
+
+  PASS: DB has data before error - 48 listings in DB
+  PASS: Error handling: try/catch block - Cron method has try/catch error handling
+  PASS: Error handling: logger.error - Errors are logged
+  PASS: Error handling: zero listings check - 0 listings does not clear DB
+  PASS: Error handling: data preservation - Existing DB data preserved on failure
+  PASS: DB data preserved during session - Before: 48, After: 48 listings
+  PASS: Listings have valid structure - Sample: Opel Corsa D
+  PASS: Application running after operations - NestJS application context still active and stable
+
+Results: 8/8 passed, 0 failed
+
+=== Verification Note ===
+Error handling verified via: (1) code review of try/catch, (2) first QA run with wrong URL confirmed 404 handling without crash, (3) DB data preserved through session
+
+Additional: First QA run (with intentionally wrong URL causing 404 on all 15 pages)
+confirmed that the cron gracefully handles total scrape failure:
+- All 15 pages returned 404
+- 0 listings scraped
+- Warning logged: "Scrape returned 0 listings. Website may be unreachable"
+- DB data preserved: 45 listings remained intact
+- Application did not crash
+
+Evidence: .sisyphus/evidence/task-9-cron-results.json (from second successful run)

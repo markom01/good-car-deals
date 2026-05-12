@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Listing {
+  id           BigInt   @id @default(autoincrement())
+  listingUrl   String   @unique @map("listing_url")
+  title        String
+  price        String
+  priceNumeric BigInt?  @map("price_numeric")
+  priceNote    String?  @map("price_note")
+  year         Int?
+  age          Int?
+  mileageKm    Int?     @map("mileage_km")
+  model        String?
+  dealType     String?  @map("deal_type")
+  dealScore    Float?   @map("deal_score")
+  pricePerYear Float?   @map("price_per_year")
+  scrapedAt    DateTime @default(now()) @map("scraped_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("listings")
+}

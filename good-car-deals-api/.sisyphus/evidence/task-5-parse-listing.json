@@ -1,0 +1,35 @@
+Task 5: Parse Listing HTML Test
+================================
+Status: COMPLETED
+
+Test: parsePage with sample HTML
+
+Sample HTML structure (featured listing):
+```html
+<section class="classified">
+  <h2 class="brand-and-model">
+    <a href="/auto/123456">Opel Corsa D 1.2</a>
+  </h2>
+  <span class="price">4.500 EUR</span>
+  <div class="second-row-info">2018 benzin 1.2L 66kW manuelni</div>
+  <div class="info">
+    <div class="setInfo"><div title="150.000 km"></div></div>
+  </div>
+  <div class="city">Beograd</div>
+</section>
+```
+
+Expected extracted fields:
+- title: "Opel Corsa D 1.2"
+- listingUrl: "https://www.polovniautomobili.com/auto/123456"
+- price: "4500"
+- priceNote: ""
+- year: "2018"
+- fuelType: "Benzin"
+- engineVolume: "1.2L"
+- powerKw: "66 kW"
+- transmission: "Manual"
+- mileageKm: "150.000 km"
+- location: "Beograd"
+
+✅ Parse test completed successfully
