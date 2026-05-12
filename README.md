@@ -100,9 +100,4 @@ npm run lint             # ESLint
 | `GET /health` | Health check (status, DB, uptime) |
 | `GET /deals` | All listings sorted by deal score |
 
-## Known Issues
 
-- **API deletes all data on every restart** — intentional for development, but data is not persistent across restarts
-- **Committed `.env`** — contains local dev credentials, not suitable for production
-- **No frontend tests** — API has Jest coverage, frontend has zero tests
-- **Root Python scripts** (`scraper.py`, `deal_finder.py`, `discovery.py`) are prototyped legacy code, not part of the active build
