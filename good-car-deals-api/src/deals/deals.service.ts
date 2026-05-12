@@ -8,17 +8,18 @@ export class DealsService {
   constructor(private prismaService: PrismaService) {}
 
   /**
-   * Get all deals sorted by price_per_year ascending (best deals first).
+   * Get good deals only (dealType starts with "GOOD DEAL"), sorted by deal score descending.
    */
   async getDeals(): Promise<Listing[]> {
-    this.logger.log('Fetching deals with year, title, and mileageKm');
+    this.logger.log('Fetching good deals');
     return this.prismaService.listing.findMany({
       where: {
+        dealType: { startsWith: 'GOOD DEAL' },
         year: { not: null },
         title: { not: '' },
         mileageKm: { not: null },
       },
-      orderBy: { pricePerYear: 'asc' },
+      orderBy: { dealScore: 'desc' },
     });
   }
 }
