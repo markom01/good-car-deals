@@ -22,3 +22,5 @@ services:
         sync: false
       - key: SCRAPER_CRON_SCHEDULE
         value: "0 0 * * 0"
+      - key: SKIP_STARTUP_SCRAPE
+        value: "true"
