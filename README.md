@@ -4,15 +4,15 @@ Scrapes classified car listings from [polovniautomobili.com](https://www.polovni
 
 ## Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | Next.js 16 (App Router) + React 19 + TypeScript |
-| **Styling** | Tailwind CSS v4 + shadcn/ui (Radix Luma) + Lucide icons |
-| **Data Fetching** | TanStack React Query v5 |
-| **Backend** | NestJS 11 (Express) + TypeScript |
-| **Database** | PostgreSQL via Prisma 7 |
-| **Scraping** | impit (HTTP) + cheerio (HTML) + @nestjs/schedule (cron) |
-| **Monorepo** | npm workspaces |
+| Layer | Technology | Hosting |
+|-------|-----------|---------|
+| **Frontend** | Next.js 16 (App Router) + React 19 + TypeScript | **Vercel** (free) |
+| **Styling** | Tailwind CSS v4 + shadcn/ui (Radix Luma) + Lucide icons | |
+| **Data Fetching** | TanStack React Query v5 | |
+| **Backend** | NestJS 11 (Express) + TypeScript | **Render** (free, spins down) |
+| **Database** | PostgreSQL via Prisma 7 | **Neon** (free, 0.5 GB) |
+| **Scraping** | impit (HTTP) + cheerio (HTML) | **Local scheduled task** (home IP) |
+| **Monorepo** | npm workspaces | |
 
 ## Project Structure
 
@@ -21,7 +21,7 @@ good car deals/
 ├── good-car-deals-api/          # NestJS backend
 │   ├── src/
 │   │   ├── deals/               # REST endpoints (GET /deals)
-│   │   ├── scraper/             # HTTP client, HTML parser, weekly cron
+│   │   ├── scraper/             # HTTP client, HTML parser
 │   │   ├── analysis/            # Deal scoring/classification
 │   │   ├── prisma/              # Database service
 │   │   └── config/              # Env validation
@@ -35,45 +35,46 @@ good car deals/
 │   │   └── lib/                 # Utils, QueryClient provider
 │   └── public/
 ├── packages/shared/             # Shared Listing interface
-└── .sisyphus/                   # AI orchestration tooling
+├── scrape-local.bat             # Local scraper launcher (Windows)
+└── .github/workflows/           # CI workflows
 ```
 
-## Getting Started
+## Deployment Architecture
 
-**Prerequisites**: Node.js ≥18, PostgreSQL running locally.
+```
+Your PC (weekly scheduled task, free)
+  └─ scrape-local.bat
+       └─ impit scrapes polovniautomobili.com (home IP, bypasses Cloudflare)
+            └─ Saves to Neon PostgreSQL
+                 └─ Render serves NestJS API
+                      └─ Vercel serves Next.js frontend (CDN)
+```
+
+- **Scraper runs from your home IP** because polovniautomobili.com blocks all cloud IPs (403).
+- **API on Render** has `SKIP_STARTUP_SCRAPE=true` — it only serves DB data.
+- **Frontend on Vercel** fetches from Render API via `NEXT_PUBLIC_API_URL`.
+
+## Getting Started (Local Dev)
+
+**Prerequisites**: Node.js ≥18
 
 ```bash
-# Install all workspace dependencies
 npm install
-
-# Set up the API database config
-cd good-car-deals-api
-cp .env.example .env
-# Edit .env with your PostgreSQL connection string
-
-# Build the API (root dev script uses compiled JS)
-npm run build
-
-# Start API + frontend concurrently
-cd ..
-npm run dev
+npm run dev        # API (port 3001) + frontend (port 3000)
 ```
-
-- **API**: http://localhost:3001
-- **Frontend**: http://localhost:3000
 
 ## Available Scripts
 
 ```bash
-# Root — run both
 npm run dev              # API + frontend concurrently
+npm run build            # Build API for production
+.\scrape-local.bat       # Scrape listings from home IP → save to Neon DB
 
 # API
 cd good-car-deals-api
 npm run start:dev        # Watch mode
 npm run build            # nest build
 npm run test             # Unit tests
-npm run test:e2e         # E2E tests
 npm run lint             # ESLint
 
 # Frontend
@@ -85,11 +86,11 @@ npm run lint             # ESLint
 
 ## How It Works
 
-1. **On startup**, the API clears all existing listings, then scrapes `polovniautomobili.com` for the configured car brand/model.
-2. Each listing is parsed (title, price, year, mileage, etc.) and stored in PostgreSQL via Prisma.
+1. **Scraper** runs weekly (Windows Task Scheduler) or manually via `scrape-local.bat`.
+2. Each listing is parsed (title, price, year, mileage, etc.) and stored in Neon PostgreSQL via Prisma.
 3. The `DealClassifierService` calculates a **deal score** based on price-per-year and market comparison.
 4. Classified listings are served at `GET /deals`, sorted by score descending.
-5. A **weekly cron job** (`@nestjs/schedule`) rescrapes for fresh data.
+5. Render API runs 24/7 on free tier (spins down after 15 min idle, wakes on request).
 6. The frontend fetches from the API using TanStack React Query and renders a deal list with score badges.
 
 ## API Routes
@@ -99,5 +100,13 @@ npm run lint             # ESLint
 | `GET /` | Hello |
 | `GET /health` | Health check (status, DB, uptime) |
 | `GET /deals` | All listings sorted by deal score |
+
+## Production URLs
+
+| Service | URL |
+|---------|-----|
+| Frontend | https://good-car-deals-frontend.vercel.app |
+| API | https://good-car-deals-api.onrender.com |
+| Health | https://good-car-deals-api.onrender.com/health |
 
 
