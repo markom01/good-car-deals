@@ -21,11 +21,20 @@ export class HttpService {
     this.baseUrl = this.configService.get<string>('scraper.targetUrl')!;
     this.brand = this.configService.get<string>('scraper.brand')!;
     this.model = this.configService.get<string>('scraper.model')!;
-    // Impit instance with Chrome TLS fingerprint impersonation to bypass Cloudflare
-    this.impit = new Impit({
+
+    const opts: Record<string, unknown> = {
       browser: 'chrome',
       timeout: this.timeout,
-    });
+    };
+
+    // Optional residential proxy to bypass Cloudflare IP blocks
+    const proxyUrl = this.configService.get<string>('scraper.proxyUrl');
+    if (proxyUrl) {
+      opts.proxyUrl = proxyUrl;
+      console.log('Using proxy for scraping');
+    }
+
+    this.impit = new Impit(opts);
   }
 
   /**
