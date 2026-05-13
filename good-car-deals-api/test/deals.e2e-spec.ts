@@ -60,7 +60,7 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
 
     it('should return deals sorted by pricePerYear (real DB query)', async () => {
       const response = await request(app.getHttpServer())
-        .get('/deals')
+        .get('/deals?sort=pricePerYear')
         .expect(200);
 
       const deals = response.body;
@@ -121,6 +121,29 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
       expect(deal).toHaveProperty('listingUrl');
 
       console.log('  All required fields present in real data');
+    });
+  });
+
+  describe('Sorting - Real Data', () => {
+    it('should return deals sorted by dealScore descending by default', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/deals')
+        .expect(200);
+
+      const deals = response.body;
+      for (let i = 1; i < deals.length; i++) {
+        const prev = deals[i - 1].dealScore;
+        const curr = deals[i].dealScore;
+        if (prev !== null && curr !== null) {
+          expect(prev).toBeGreaterThanOrEqual(curr);
+        }
+      }
+    });
+
+    it('should return 400 for invalid sort parameter', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/deals?sort=invalid')
+        .expect(400);
     });
   });
 
