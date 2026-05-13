@@ -99,7 +99,7 @@ npm run lint             # ESLint
 |-------|-------------|
 | `GET /` | Hello |
 | `GET /health` | Health check (status, DB, uptime) |
-| `GET /deals` | All listings sorted by deal score |
+| `GET /deals` | Good deals, sorted by `dealScore` desc (`?sort=pricePerYear` for price/year asc) |
 
 ## Production URLs
 
