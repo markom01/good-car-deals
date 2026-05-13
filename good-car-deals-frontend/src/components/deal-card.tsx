@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -8,15 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
 import type { Listing } from '@good-car-deals/shared';
-
-function getBadgeVariant(dealType: string | null): 'default' | 'secondary' | 'destructive' | 'outline' | 'ghost' | 'link' {
-  if (!dealType) return 'secondary';
-  const lower = dealType.toLowerCase();
-  if (lower.includes('great') || lower.includes('good deal') || lower.includes('decent')) return 'default';
-  if (lower.includes('overpriced') || lower.includes('bad') || lower.includes('fair')) return 'destructive';
-  return 'outline';
-}
 
 function formatNumber(n: number | null): string {
   if (n === null || n === undefined) return 'N/A';
@@ -25,7 +17,7 @@ function formatNumber(n: number | null): string {
 
 export function DealCard({ deal }: { deal: Listing }) {
   return (
-    <Card>
+    <Card className="min-w-[320px] max-w-md w-full">
       <CardHeader>
         <CardTitle className="line-clamp-2">{deal.title}</CardTitle>
         <CardDescription>
@@ -33,12 +25,17 @@ export function DealCard({ deal }: { deal: Listing }) {
         </CardDescription>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="space-y-4">
         <div className="flex items-baseline justify-between">
           <span className="text-muted-foreground text-sm">Price</span>
-          <span className="text-2xl font-bold tabular-nums">{deal.priceNumeric != null ? formatNumber(deal.priceNumeric) : deal.price}</span>
+          <span className="text-2xl font-bold tabular-nums tracking-tight">
+            {deal.priceNumeric != null ? formatNumber(deal.priceNumeric) : deal.price}
+          </span>
         </div>
-        <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-4 pt-4 border-t text-sm">
+
+        <Separator />
+
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
           <span className="text-muted-foreground">Deal Score</span>
           <span className="text-right font-mono tabular-nums">{deal.dealScore?.toFixed(2) ?? 'N/A'}</span>
           <span className="text-muted-foreground">Price/Year</span>
@@ -46,11 +43,8 @@ export function DealCard({ deal }: { deal: Listing }) {
         </div>
       </CardContent>
 
-      <CardFooter className="flex items-center justify-between">
-        <Badge variant={getBadgeVariant(deal.dealType)}>
-          {deal.dealType ?? 'Unclassified'}
-        </Badge>
-        <Button variant="link" asChild>
+      <CardFooter>
+        <Button className="w-full" asChild>
           <a href={deal.listingUrl} target="_blank" rel="noopener noreferrer">
             View Listing &rarr;
           </a>

@@ -9,9 +9,11 @@ export function DealList() {
   if (!deals) return null;
   
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
       {deals.map((deal) => (
-        <DealCard key={deal.id} deal={deal} />
+        <div key={deal.id} className="flex justify-center">
+          <DealCard deal={deal} />
+        </div>
       ))}
     </div>
   );
