@@ -11,7 +11,7 @@ Scrapes classified car listings from [polovniautomobili.com](https://www.polovni
 | **Data Fetching** | TanStack React Query v5 | |
 | **Backend** | NestJS 11 (Express) + TypeScript | **Render** (free, spins down) |
 | **Database** | PostgreSQL via Prisma 7 | **Neon** (free, 0.5 GB) |
-| **Scraping** | impit (HTTP) + cheerio (HTML) | **Local scheduled task** (home IP) |
+| **Scraping** | impit (Firefox + HTTP/3) + cheerio (HTML) | **Render** (built-in, no proxies) |
 | **Monorepo** | npm workspaces | |
 
 ## Project Structure
@@ -42,16 +42,15 @@ good car deals/
 ## Deployment Architecture
 
 ```
-Your PC (weekly scheduled task, free)
-  └─ scrape-local.bat
-       └─ impit scrapes polovniautomobili.com (home IP, bypasses Cloudflare)
-            └─ Saves to Neon PostgreSQL
-                 └─ Render serves NestJS API
-                      └─ Vercel serves Next.js frontend (CDN)
+Render API (Firefox + HTTP/3 fingerprint)
+  └─ impit scrapes polovniautomobili.com (bypasses Cloudflare)
+       └─ Saves to Neon PostgreSQL
+            └─ Render serves NestJS API
+                 └─ Vercel serves Next.js frontend (CDN)
 ```
 
-- **Scraper runs from your home IP** because polovniautomobili.com blocks all cloud IPs (403).
-- **API on Render** has `SKIP_STARTUP_SCRAPE=true` — it only serves DB data.
+- **Scraper runs directly on Render** using Firefox TLS fingerprint + HTTP/3 (QUIC) — bypasses Cloudflare without proxies.
+- **API on Render** has `SKIP_STARTUP_SCRAPE=true` to avoid re-scraping on cold start. Weekly cron via `@nestjs/schedule` keeps data fresh.
 - **Frontend on Vercel** fetches from Render API via `NEXT_PUBLIC_API_URL`.
 
 ## Getting Started (Local Dev)
@@ -86,12 +85,13 @@ npm run lint             # ESLint
 
 ## How It Works
 
-1. **Scraper** runs weekly (Windows Task Scheduler) or manually via `scrape-local.bat`.
-2. Each listing is parsed (title, price, year, mileage, etc.) and stored in Neon PostgreSQL via Prisma.
-3. The `DealClassifierService` calculates a **deal score** based on price-per-year and market comparison.
-4. Classified listings are served at `GET /deals`, sorted by score descending.
-5. Render API runs 24/7 on free tier (spins down after 15 min idle, wakes on request).
-6. The frontend fetches from the API using TanStack React Query and renders a deal list with score badges.
+1. **Scraper** runs on Render via `@nestjs/schedule` (weekly cron) and on every cold start.
+2. Uses **impit** with **Firefox TLS fingerprint + HTTP/3 (QUIC)** to bypass Cloudflare.
+3. Each listing is parsed (title, price, year, mileage, etc.) and stored in Neon PostgreSQL via Prisma.
+4. The `DealClassifierService` calculates a **deal score** based on price-per-year and market comparison.
+5. Classified listings are served at `GET /deals`, sorted by score descending.
+6. Render API runs 24/7 on free tier (spins down after 15 min idle, wakes on request).
+7. The frontend fetches from the API using TanStack React Query and renders a deal list with score badges.
 
 ## API Routes
 
