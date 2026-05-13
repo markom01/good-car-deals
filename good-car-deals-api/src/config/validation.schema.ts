@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 
@@ -23,6 +23,7 @@ export class EnvironmentVariables {
   @IsNotEmpty()
   SCRAPER_CRON_SCHEDULE!: string;
 
+  @IsOptional()
   @IsString()
   SCRAPER_PROXY_URL?: string;
 }
