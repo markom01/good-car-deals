@@ -4,8 +4,6 @@
       "good-car-deals-api": false
     }
   },
-  "installCommand": "npm install",
-  "buildCommand": "cd good-car-deals-frontend && npm run build",
-  "outputDirectory": "good-car-deals-frontend/.next",
+  "rootDirectory": "good-car-deals-frontend",
   "framework": "nextjs"
 }
