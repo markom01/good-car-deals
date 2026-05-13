@@ -11,7 +11,7 @@ export class HttpService {
   private readonly maxRetries = 3;
   private readonly headers = {
     'User-Agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0',
     'Accept-Language': 'en-US,en;q=0.9',
     Referer: 'https://www.google.com/',
     Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -24,8 +24,9 @@ export class HttpService {
     this.model = this.configService.get<string>('scraper.model')!;
 
     const opts: Record<string, unknown> = {
-      browser: 'chrome',
+      browser: 'firefox',
       timeout: this.timeout,
+      http3: true,
     };
 
     // Optional residential proxy to bypass Cloudflare IP blocks
