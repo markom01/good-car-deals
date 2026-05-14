@@ -12,3 +12,6 @@ __pycache__/
 .sisyphus/notepads/
 .vercel
 *.py
+
+# Local scraper script
+scrape-local.bat
