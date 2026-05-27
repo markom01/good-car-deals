@@ -1,6 +1,6 @@
 import { Controller, DefaultValuePipe, Get, ParseEnumPipe, Query } from '@nestjs/common';
 import { DealsService } from './deals.service';
-import { Listing } from '../prisma/prisma.service';
+import { Listing } from '@good-car-deals/shared';
 
 export enum DealSort {
   SCORE = 'score',
