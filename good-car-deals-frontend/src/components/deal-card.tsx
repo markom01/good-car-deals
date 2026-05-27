@@ -13,7 +13,7 @@ import type { Listing } from '@good-car-deals/shared';
 
 function formatNumber(n: number | null): string {
   if (n === null || n === undefined) return 'N/A';
-  return n.toLocaleString('en-US');
+  return Math.round(n).toLocaleString('en-US');
 }
 
 export function DealCard({ deal }: { deal: Listing }) {
@@ -45,7 +45,7 @@ export function DealCard({ deal }: { deal: Listing }) {
                     : 'ghost'
               }
             >
-              {deal.priceToModelAvgPct > 0 ? '+' : ''}{deal.priceToModelAvgPct}%
+              {deal.priceToModelAvgPct > 0 ? '+' : ''}{Math.round(deal.priceToModelAvgPct)}%
             </Badge>
             <span className="text-muted-foreground text-xs">
               compared to €{formatNumber(deal.modelAvgPriceNumeric)}
@@ -57,7 +57,7 @@ export function DealCard({ deal }: { deal: Listing }) {
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
           <span className="text-muted-foreground">Deal Score</span>
-          <span className="text-right font-mono tabular-nums">{deal.dealScore?.toFixed(2) ?? 'N/A'}</span>
+          <span className="text-right font-mono tabular-nums">{deal.dealScore != null ? Math.round(deal.dealScore).toLocaleString('en-US') : 'N/A'}</span>
           <span className="text-muted-foreground">Price/Year</span>
           <span className="text-right font-mono tabular-nums">{formatNumber(deal.pricePerYear)}</span>
         </div>
