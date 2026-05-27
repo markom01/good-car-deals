@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import type { Listing } from '@good-car-deals/shared';
 
 function formatNumber(n: number | null): string {
@@ -32,6 +33,25 @@ export function DealCard({ deal }: { deal: Listing }) {
             {deal.priceNumeric != null ? formatNumber(deal.priceNumeric) : deal.price}
           </span>
         </div>
+
+        {deal.priceToModelAvgPct !== null && deal.modelAvgPriceNumeric !== null && (
+          <div className="flex items-center gap-2">
+            <Badge
+              variant={
+                deal.priceToModelAvgPct < 0
+                  ? 'default'
+                  : deal.priceToModelAvgPct > 0
+                    ? 'destructive'
+                    : 'ghost'
+              }
+            >
+              {deal.priceToModelAvgPct > 0 ? '+' : ''}{deal.priceToModelAvgPct}%
+            </Badge>
+            <span className="text-muted-foreground text-xs">
+              compared to €{formatNumber(deal.modelAvgPriceNumeric)}
+            </span>
+          </div>
+        )}
 
         <Separator />
 
