@@ -14,4 +14,6 @@ export interface Listing {
   pricePerYear: number | null;
   scrapedAt: string;
   updatedAt: string;
+  modelAvgPriceNumeric: number | null;
+  priceToModelAvgPct: number | null;
 }
