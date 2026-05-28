@@ -1,15 +1,25 @@
+"use client"
+
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+} from "@/components/ui/carousel"
+import { DealCard } from "@/components/deal-card"
+import { MOCK_DEALS } from "./mock-deals"
+import Autoplay from "embla-carousel-autoplay"
 
 export default function WheelRankPage() {
   return (
     <div className="min-h-screen bg-background">
       <main className="mx-auto max-w-5xl px-4 py-16 md:py-24">
-        {/* 1. HERO SECTION — Split layout */}
-        <div className="grid grid-cols-1 items-center gap-12 md:grid-cols-5">
-          <div className="md:col-span-3">
+        {/* 1. HERO SECTION — Vertical layout with carousel */}
+        <div className="flex flex-col gap-12">
+          <div>
             <img
               src="/wheelrank-logo.svg"
               alt="WheelRank"
@@ -22,20 +32,40 @@ export default function WheelRankPage() {
               WheelRank
             </h1>
             <p className="mb-4 text-xl text-muted-foreground">
-              Used car deals, ranked.
+              Used vehicle deals, ranked.
             </p>
             <p className="mb-8 max-w-prose text-base text-muted-foreground">
-              WheelRank analyzes used car listings and assigns every deal a Deal Score —
+              WheelRank analyzes used vehicle listings and assigns every deal a Deal Score —
               an objective 0-100 rating based on market data. Stop guessing. Start ranking.
             </p>
             <Button variant="default" size="lg">
               Learn More
             </Button>
           </div>
-          <div className="md:col-span-2">
-            <div className="flex aspect-[4/3] items-center justify-center rounded-2xl border-2 border-dashed border-border bg-muted">
-              <p className="text-sm text-muted-foreground">App screenshot</p>
-            </div>
+
+          <div className="overflow-hidden -mx-2">
+          <Carousel
+            className="mx-2 [&_[data-slot='carousel-content']]:!overflow-visible"
+            opts={{ loop: true, align: "start" }}
+            plugins={[
+              Autoplay({
+                delay: 4000,
+                stopOnInteraction: false,
+                stopOnMouseEnter: false,
+              }),
+            ]}
+          >
+            <CarouselContent>
+              {MOCK_DEALS.map((deal) => (
+                <CarouselItem
+                  key={deal.id}
+                  className="basis-full md:basis-1/2 lg:basis-1/3 py-2 max-sm:px-4"
+                >
+                  <DealCard deal={deal} />
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+          </Carousel>
           </div>
         </div>
 
@@ -65,7 +95,7 @@ export default function WheelRankPage() {
             <div>
               <p className="mb-2 text-3xl font-bold text-primary">21%</p>
               <p className="mb-1 text-sm text-muted-foreground">
-                average overpay on cars with rolled back odometers
+                average overpay on vehicles with rolled back odometers
               </p>
               <a
                 href="https://www.carvertical.com/blog/odometer-fraud-vs-car-value"
@@ -81,7 +111,7 @@ export default function WheelRankPage() {
             <div>
               <p className="mb-2 text-3xl font-bold text-primary">€67.9B</p>
               <p className="mb-1 text-sm text-muted-foreground">
-                Europe used car market value (2026)
+                Europe used vehicle market value (2026)
               </p>
               <a
                 href="https://www.marketdataforecast.com/market-reports/europe-used-cars-market"
@@ -100,13 +130,13 @@ export default function WheelRankPage() {
           <Card>
             <CardHeader>
               <Badge variant="secondary" className="mb-2 w-fit">
-                Used Car Market
+                Used Vehicle Market
               </Badge>
               <CardTitle>The Problem</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground">
-                Serbia&apos;s largest classifieds site lists ~75,000–80,000 used cars,
+                Serbia&apos;s largest classifieds site lists ~75,000–80,000 used vehicles,
                 yet no tool provides an objective assessment. Buyers navigate subjective ads,
                 hidden defects, and no standardized way to compare deals.
               </p>
