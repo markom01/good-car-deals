@@ -48,7 +48,7 @@ export function DealCard({ deal }: { deal: Listing }) {
               {deal.priceToModelAvgPct > 0 ? '+' : ''}{Math.round(deal.priceToModelAvgPct)}%
             </Badge>
             <span className="text-muted-foreground text-xs">
-              compared to €{formatNumber(deal.modelAvgPriceNumeric)}
+              compared to model average of €{formatNumber(deal.modelAvgPriceNumeric)}
             </span>
           </div>
         )}

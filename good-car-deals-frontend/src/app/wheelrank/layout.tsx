@@ -7,9 +7,9 @@ const archivo = Archivo({
 })
 
 export const metadata: Metadata = {
-  title: "WheelRank — Used Car Deals, Ranked.",
+  title: "WheelRank — Used Vehicle Deals, Ranked.",
   description:
-    "WheelRank analyzes used car listings and assigns every deal a Deal Score — an objective 0-100 rating based on market data. Part of Raising Starts 2026.",
+    "WheelRank analyzes used vehicle listings and assigns every deal a Deal Score — an objective 0-100 rating based on market data. Part of Raising Starts 2026.",
 }
 
 export default function WheelRankLayout({
