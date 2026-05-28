@@ -4,7 +4,7 @@ import type { Listing } from '@good-car-deals/shared';
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
 
 async function fetchDeals({ signal }: QueryFunctionContext): Promise<Listing[]> {
-  const res = await fetch(`${API_URL}/deals`, { signal });
+  const res = await fetch(`${API_URL}/deals`, { signal: AbortSignal.any([signal, AbortSignal.timeout(60000)]) });
   if (!res.ok) {
     throw new Error(`Failed to fetch deals: ${res.status} ${res.statusText}`);
   }
@@ -15,5 +15,7 @@ export function useDeals() {
   return useQuery({
     queryKey: ['deals'],
     queryFn: fetchDeals,
+    retry: 1,
+    retryDelay: 30000,
   });
 }
