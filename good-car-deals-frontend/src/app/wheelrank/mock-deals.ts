@@ -3,7 +3,7 @@ import type { Listing } from "@good-car-deals/shared"
 export const MOCK_DEALS: Listing[] = [
   {
     id: 1,
-    listingUrl: "https://www.polovniautomobili.com/opel-astra-2018-12345",
+    listingUrl: "",
     title: "Opel Astra 1.6 CDTI 2018",
     price: "€9,500",
     priceNumeric: 9500,
@@ -22,7 +22,7 @@ export const MOCK_DEALS: Listing[] = [
   },
   {
     id: 2,
-    listingUrl: "https://www.polovniautomobili.com/vw-golf-2020-23456",
+    listingUrl: "",
     title: "VW Golf 2.0 TDI 2020",
     price: "€16,800",
     priceNumeric: 16800,
@@ -41,7 +41,7 @@ export const MOCK_DEALS: Listing[] = [
   },
   {
     id: 3,
-    listingUrl: "https://www.polovniautomobili.com/skoda-octavia-2019-34567",
+    listingUrl: "",
     title: "Škoda Octavia 1.5 TSI 2019",
     price: "€11,200",
     priceNumeric: 11200,
@@ -60,7 +60,7 @@ export const MOCK_DEALS: Listing[] = [
   },
   {
     id: 4,
-    listingUrl: "https://www.polovniautomobili.com/ford-focus-2020-45678",
+    listingUrl: "",
     title: "Ford Focus 1.5 EcoBlue 2020",
     price: "€10,500",
     priceNumeric: 10500,
@@ -79,7 +79,7 @@ export const MOCK_DEALS: Listing[] = [
   },
   {
     id: 5,
-    listingUrl: "https://www.polovniautomobili.com/audi-a3-2019-56789",
+    listingUrl: "",
     title: "Audi A3 2.0 TDI 2019",
     price: "€15,500",
     priceNumeric: 15500,
@@ -98,7 +98,7 @@ export const MOCK_DEALS: Listing[] = [
   },
   {
     id: 6,
-    listingUrl: "https://www.polovniautomobili.com/bmw-320d-2017-67890",
+    listingUrl: "",
     title: "BMW 320d xDrive 2017",
     price: "€18,200",
     priceNumeric: 18200,
@@ -117,7 +117,7 @@ export const MOCK_DEALS: Listing[] = [
   },
   {
     id: 7,
-    listingUrl: "https://www.polovniautomobili.com/renault-clio-2021-78901",
+    listingUrl: "",
     title: "Renault Clio 1.5 dCi 2021",
     price: "€9,800",
     priceNumeric: 9800,
@@ -136,7 +136,7 @@ export const MOCK_DEALS: Listing[] = [
   },
   {
     id: 8,
-    listingUrl: "https://www.polovniautomobili.com/peugeot-308-2022-89012",
+    listingUrl: "",
     title: "Peugeot 308 1.5 BlueHDi 2022",
     price: "€16,500",
     priceNumeric: 16500,

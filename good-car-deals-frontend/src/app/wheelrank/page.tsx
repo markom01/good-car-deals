@@ -16,14 +16,14 @@ import Autoplay from "embla-carousel-autoplay"
 export default function WheelRankPage() {
   return (
     <div className="min-h-screen bg-background">
-      <main className="mx-auto max-w-5xl px-4 py-16 md:py-24">
-        {/* 1. HERO SECTION — Vertical layout with carousel */}
-        <div className="flex flex-col gap-12">
-          <div>
+      <main className="mx-auto max-w-5xl px-4">
+        {/* 1. HERO SECTION — Full viewport, centered */}
+        <div className="min-h-dvh flex flex-col justify-center gap-6 md:gap-12 pt-2 pb-4 md:pt-6 md:pb-12">
+          <div className="flex flex-col items-center text-center">
             <img
               src="/wheelrank-logo.svg"
               alt="WheelRank"
-              className="mb-6 size-16"
+              className="mb-4 md:mb-6 size-16"
             />
             <Badge variant="secondary" className="mb-4">
               Raising Starts 2026
@@ -34,12 +34,12 @@ export default function WheelRankPage() {
             <p className="mb-4 text-xl text-muted-foreground">
               Used vehicle deals, ranked.
             </p>
-            <p className="mb-8 max-w-prose text-base text-muted-foreground">
+            <p className="mb-6 md:mb-8 max-w-prose text-base text-muted-foreground">
               WheelRank analyzes used vehicle listings and assigns every deal a Deal Score —
               an objective 0-100 rating based on market data. Stop guessing. Start ranking.
             </p>
-            <Button variant="default" size="lg">
-              Learn More
+            <Button variant="default" size="lg" asChild>
+              <a href="#market-stats">Learn More</a>
             </Button>
           </div>
 
@@ -59,7 +59,7 @@ export default function WheelRankPage() {
               {MOCK_DEALS.map((deal) => (
                 <CarouselItem
                   key={deal.id}
-                  className="basis-full md:basis-1/2 lg:basis-1/3 py-2 max-sm:px-4"
+                  className="basis-full md:basis-1/2 lg:basis-1/3 py-2 max-sm:px-4 flex justify-center"
                 >
                   <DealCard deal={deal} />
                 </CarouselItem>
@@ -73,7 +73,7 @@ export default function WheelRankPage() {
         <Separator className="my-16 md:my-24" />
 
         {/* 2. MARKET STATS SECTION */}
-        <section className="mb-16 md:mb-24">
+        <section id="market-stats" className="mb-16 md:mb-24">
           <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
             {/* Stat 1: Save Time */}
             <div>
@@ -125,65 +125,66 @@ export default function WheelRankPage() {
           </div>
         </section>
 
-        {/* 3. PROBLEM SECTION */}
-        <section className="mb-16 md:mb-24">
-          <Card>
-            <CardHeader>
-              <Badge variant="secondary" className="mb-2 w-fit">
-                Used Vehicle Market
-              </Badge>
-              <CardTitle>The Problem</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
-                Serbia&apos;s largest classifieds site lists ~75,000–80,000 used vehicles,
-                yet no tool provides an objective assessment. Buyers navigate subjective ads,
-                hidden defects, and no standardized way to compare deals.
-              </p>
-            </CardContent>
-          </Card>
-        </section>
+        {/* 3. PROBLEM + SOLUTION — side by side on desktop */}
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 mb-16 md:mb-24">
+          <section>
+            <Card className="h-full">
+              <CardHeader>
+                <Badge variant="secondary" className="mb-2 w-fit">
+                  Used Vehicle Market
+                </Badge>
+                <CardTitle>The Problem</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-muted-foreground">
+                  Serbia&apos;s largest classifieds site lists ~75,000–80,000 used vehicles,
+                  yet no tool provides an objective assessment. Buyers navigate subjective ads,
+                  hidden defects, and no standardized way to compare deals.
+                </p>
+              </CardContent>
+            </Card>
+          </section>
 
-        {/* 4. SOLUTION SECTION */}
-        <section className="mb-16 md:mb-24">
-          <Card>
-            <CardHeader>
-              <Badge variant="secondary" className="mb-2 w-fit">
-                WheelRank
-              </Badge>
-              <CardTitle>The Deal Score</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="mb-4 text-muted-foreground">
-                WheelRank assigns every listing a Deal Score (0–100) using two methods:
-                price-per-year ranking and model average comparison.
-              </p>
-              <ul className="flex flex-col gap-3 text-sm">
-                <li className="flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-primary" />
-                  <span>
-                    <strong className="text-foreground">GOOD DEAL</strong>{" "}
-                    <span className="text-muted-foreground">(top 20%) — Score 80–100</span>
-                  </span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-primary/60" />
-                  <span>
-                    <strong className="text-foreground">DECENT DEAL</strong>{" "}
-                    <span className="text-muted-foreground">(20–50%) — Score 50–79</span>
-                  </span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="size-2 rounded-full bg-destructive" />
-                  <span>
-                    <strong className="text-foreground">OVERPRICED</strong>{" "}
-                    <span className="text-muted-foreground">(bottom 50%) — Score 0–49</span>
-                  </span>
-                </li>
-              </ul>
-            </CardContent>
-          </Card>
-        </section>
+          <section>
+            <Card className="h-full">
+              <CardHeader>
+                <Badge variant="secondary" className="mb-2 w-fit">
+                  WheelRank
+                </Badge>
+                <CardTitle>The Deal Score</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="mb-4 text-muted-foreground">
+                  WheelRank assigns every listing a Deal Score (0–100) using two methods:
+                  price-per-year ranking and model average comparison.
+                </p>
+                <ul className="flex flex-col gap-3 text-sm">
+                  <li className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-primary" />
+                    <span>
+                      <strong className="text-foreground">GOOD DEAL</strong>{" "}
+                      <span className="text-muted-foreground">(top 20%) — Score 80–100</span>
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-primary/60" />
+                    <span>
+                      <strong className="text-foreground">DECENT DEAL</strong>{" "}
+                      <span className="text-muted-foreground">(20–50%) — Score 50–79</span>
+                    </span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-destructive" />
+                    <span>
+                      <strong className="text-foreground">OVERPRICED</strong>{" "}
+                      <span className="text-muted-foreground">(bottom 50%) — Score 0–49</span>
+                    </span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          </section>
+        </div>
 
         {/* 5. BENEFITS SECTION */}
         <section className="mb-16 md:mb-24">
@@ -242,22 +243,10 @@ export default function WheelRankPage() {
                 WheelRank is participating in the Raising Starts accelerator program
                 by NTP Belgrade, supported by the Swiss Government.
               </p>
-              <Button variant="default" size="lg">
-                Learn More
-              </Button>
             </CardContent>
           </Card>
         </section>
 
-        {/* Separator before Footer */}
-        <Separator className="mb-8" />
-
-        {/* 7. FOOTER */}
-        <footer>
-          <p className="text-sm text-muted-foreground">
-            &copy; 2026 WheelRank
-          </p>
-        </footer>
       </main>
     </div>
   )

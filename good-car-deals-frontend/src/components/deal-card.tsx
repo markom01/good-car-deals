@@ -63,13 +63,15 @@ export function DealCard({ deal }: { deal: Listing }) {
         </div>
       </CardContent>
 
-      <CardFooter>
-        <Button className="w-full" asChild>
-          <a href={deal.listingUrl} target="_blank" rel="noopener noreferrer">
-            View Listing &rarr;
-          </a>
-        </Button>
-      </CardFooter>
+      {deal.listingUrl && (
+        <CardFooter>
+          <Button className="w-full" asChild>
+            <a href={deal.listingUrl} target="_blank" rel="noopener noreferrer">
+              View Listing &rarr;
+            </a>
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   );
 }
