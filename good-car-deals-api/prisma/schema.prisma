@@ -20,6 +20,13 @@ model Listing {
   dealType     String?  @map("deal_type")
   dealScore    Float?   @map("deal_score")
   pricePerYear Float?   @map("price_per_year")
+  fuelType     String?  @map("fuel_type")
+  engineCc     Int?     @map("engine_cc")
+  powerKw      Int?     @map("power_kw")
+  transmission String?
+  location     String?
+  expectedPrice Float?  @map("expected_price")
+  deviationPct Float?   @map("deviation_pct")
   scrapedAt    DateTime @default(now()) @map("scraped_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

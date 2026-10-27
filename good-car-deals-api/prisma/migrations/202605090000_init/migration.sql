@@ -7,7 +7,7 @@ CREATE TABLE "listings" (
     "listing_url" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "price" TEXT NOT NULL,
-    "price_numeric" INTEGER,
+    "price_numeric" BIGINT,
     "price_note" TEXT,
     "year" INTEGER,
     "age" INTEGER,
