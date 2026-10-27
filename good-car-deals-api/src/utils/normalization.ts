@@ -82,6 +82,29 @@ export function extractModel(title: string): string | null {
 }
 
 /**
+ * Parse engine displacement string to cubic centimeters
+ * Input: "1956 cm3" → 1956
+ * Input: "1598" → 1598
+ * Input: "" / garbage → null
+ */
+export function parseEngineCc(engineVolume: string | null): number | null {
+  if (!engineVolume) return null;
+  const parsed = parseInt(engineVolume.match(/-?\d+(\.\d+)?/)?.[0] ?? '', 10);
+  return isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Parse power string to kilowatts
+ * Input: "81 kW" → 81
+ * Input: "" / garbage → null
+ */
+export function parsePowerKw(powerKw: string | null): number | null {
+  if (!powerKw) return null;
+  const parsed = parseInt(powerKw.match(/-?\d+(\.\d+)?/)?.[0] ?? '', 10);
+  return isNaN(parsed) ? null : parsed;
+}
+
+/**
  * Calculate age from year
  * Uses dynamic current year calculation (NOT hardcoded)
  * Input: 2018 → currentYear - 2018

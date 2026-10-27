@@ -1,4 +1,11 @@
-import { normalizeMileage, normalizePrice, extractModel, calculateAge } from './normalization';
+import {
+  normalizeMileage,
+  normalizePrice,
+  extractModel,
+  calculateAge,
+  parseEngineCc,
+  parsePowerKw,
+} from './normalization';
 
 // Test data (no external dependencies)
 const testListings = [
@@ -45,6 +52,31 @@ describe('normalizePrice', () => {
     expect(normalizePrice('Price on request').numeric).toBeNull();
     expect(normalizePrice('').numeric).toBeNull();
     expect(normalizePrice(null as unknown as string).numeric).toBeNull();
+  });
+});
+
+describe('parseEngineCc', () => {
+  it('parses "1956 cm3" to 1956', () => {
+    expect(parseEngineCc('1956 cm3')).toBe(1956);
+  });
+
+  it('parses "1598" to 1598', () => {
+    expect(parseEngineCc('1598')).toBe(1598);
+  });
+
+  it('returns null for empty/garbage', () => {
+    expect(parseEngineCc('')).toBeNull();
+    expect(parseEngineCc('aka')).toBeNull();
+  });
+});
+
+describe('parsePowerKw', () => {
+  it('parses "81 kW" to 81', () => {
+    expect(parsePowerKw('81 kW')).toBe(81);
+  });
+
+  it('returns null for non-numeric', () => {
+    expect(parsePowerKw('')).toBeNull();
   });
 });
 

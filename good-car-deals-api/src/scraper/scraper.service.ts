@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { HttpService } from './http.service';
 import { HtmlParserService, RawListingData } from './html-parser.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { parseEngineCc, parsePowerKw } from '../utils/normalization';
 import { Listing } from '@prisma/client';
 
 @Injectable()
@@ -143,6 +144,11 @@ export class ScraperService {
             age,
             mileageKm,
             model,
+            fuelType: raw.fuelType?.trim() || null,
+            engineCc: parseEngineCc(raw.engineVolume),
+            powerKw: parsePowerKw(raw.powerKw),
+            transmission: raw.transmission?.trim() || null,
+            location: raw.location?.trim() || null,
             scrapedAt: new Date(),
             updatedAt: new Date(),
           },
@@ -156,6 +162,11 @@ export class ScraperService {
             age,
             mileageKm,
             model,
+            fuelType: raw.fuelType?.trim() || null,
+            engineCc: parseEngineCc(raw.engineVolume),
+            powerKw: parsePowerKw(raw.powerKw),
+            transmission: raw.transmission?.trim() || null,
+            location: raw.location?.trim() || null,
           },
         });
 
