@@ -46,7 +46,9 @@ describe('E2E Test - Real Data Flow', () => {
       // Log sample listings
       console.log(`\n  Sample listings found:`);
       for (const deal of response.body.slice(0, 5)) {
-        console.log(`    - ${deal.title} | ${deal.price} | ${deal.year}y | ${deal.mileageKm}km | ${deal.dealType}`);
+        console.log(
+          `    - ${deal.title} | ${deal.price} | ${deal.year}y | ${deal.mileageKm}km | ${deal.dealType}`,
+        );
       }
       if (response.body.length > 5) {
         console.log(`    ... and ${response.body.length - 5} more`);
@@ -83,7 +85,7 @@ describe('E2E Test - Real Data Flow', () => {
 
     it('should be sorted by pricePerYear ascending', async () => {
       const response = await request(app.getHttpServer())
-        .get('/deals')
+        .get('/deals?sort=pricePerYear')
         .expect(200);
 
       const deals = response.body;
@@ -108,7 +110,9 @@ describe('E2E Test - Real Data Flow', () => {
       const deals = response.body;
 
       // Count deals with deal_type set
-      const classifiedCount = deals.filter((d: { dealType: string | null }) => d.dealType !== null).length;
+      const classifiedCount = deals.filter(
+        (d: { dealType: string | null }) => d.dealType !== null,
+      ).length;
 
       console.log(`\n  Classified: ${classifiedCount}/${deals.length}`);
 

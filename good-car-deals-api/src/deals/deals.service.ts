@@ -10,11 +10,12 @@ export class DealsService {
   constructor(private prismaService: PrismaService) {}
 
   /**
-   * Get good deals only (dealType starts with "GOOD DEAL"), sorted by the given sort option,
-   * with per-model average priceNumeric and per-listing percentage from that average.
+   * Get good deals only (v2 gate: dealType GREAT DEAL or GOOD DEAL), sorted
+   * by the given sort option, with the per-model pooled expected-price
+   * average and per-listing percentage from that average.
    */
   async getDeals(sort: DealSort = DealSort.SCORE): Promise<Listing[]> {
-    this.logger.log(`Fetching good deals sorted by ${sort}`);
+    this.logger.log(`Fetching deals (GREAT/GOOD) sorted by ${sort}`);
 
     const orderBy =
       sort === DealSort.PRICE_PER_YEAR
@@ -23,7 +24,7 @@ export class DealsService {
 
     const listings = await this.prismaService.listing.findMany({
       where: {
-        dealType: { startsWith: 'GOOD DEAL' },
+        dealType: { in: ['GREAT DEAL', 'GOOD DEAL'] },
         year: { not: null },
         title: { not: '' },
         mileageKm: { not: null },
@@ -31,39 +32,48 @@ export class DealsService {
       orderBy,
     });
 
-    // Compute per-model average priceNumeric via groupBy
-    const modelAverages = await this.prismaService.listing.groupBy({
-      by: ['model'],
+    // v2 model-average pool: ALL rows with an expected price (any deal
+    // tier, not just good deals), same model, year ±1 of the listing;
+    // ≥3 rows in the window required.
+    const poolRows = await this.prismaService.listing.findMany({
       where: {
         model: { not: null },
-        priceNumeric: { not: null },
-        dealType: { startsWith: 'GOOD DEAL' },
+        expectedPrice: { not: null },
+        year: { not: null },
       },
-      _avg: { priceNumeric: true },
-      _count: { model: true },
+      select: { model: true, year: true, expectedPrice: true },
     });
 
-    // Build map: model -> average price (only models with 2+ listings)
-    const modelAvgMap = new Map<string, number>();
-    for (const entry of modelAverages) {
-      if (
-        entry.model &&
-        entry._count.model >= 2 &&
-        entry._avg.priceNumeric !== null
-      ) {
-        modelAvgMap.set(entry.model, Number(entry._avg.priceNumeric));
-      }
+    const poolsByModel = new Map<
+      string,
+      { year: number; expectedPrice: number }[]
+    >();
+    for (const p of poolRows) {
+      const pool = poolsByModel.get(p.model!);
+      const entry = { year: p.year!, expectedPrice: p.expectedPrice! };
+      if (pool) pool.push(entry);
+      else poolsByModel.set(p.model!, [entry]);
     }
 
     // Attach average and percentage to each listing
     return listings.map((listing) => {
-      const modelAvg =
-        listing.model !== null
-          ? modelAvgMap.get(listing.model) ?? null
-          : null;
+      let modelAvg: number | null = null;
+      if (listing.model !== null && listing.year !== null) {
+        const window = (poolsByModel.get(listing.model) ?? []).filter(
+          (p) => Math.abs(p.year - listing.year!) <= 1,
+        );
+        if (window.length >= 3) {
+          modelAvg =
+            window.reduce((sum, p) => sum + p.expectedPrice, 0) / window.length;
+        }
+      }
 
       let pct: number | null = null;
-      if (modelAvg !== null && modelAvg !== 0 && listing.priceNumeric !== null) {
+      if (
+        modelAvg !== null &&
+        modelAvg !== 0 &&
+        listing.priceNumeric !== null
+      ) {
         pct = Math.round(
           ((Number(listing.priceNumeric) - modelAvg) / modelAvg) * 100,
         );
@@ -75,9 +85,7 @@ export class DealsService {
         scrapedAt: listing.scrapedAt.toISOString(),
         updatedAt: listing.updatedAt.toISOString(),
         priceNumeric:
-          listing.priceNumeric !== null
-            ? Number(listing.priceNumeric)
-            : null,
+          listing.priceNumeric !== null ? Number(listing.priceNumeric) : null,
         modelAvgPriceNumeric: modelAvg,
         priceToModelAvgPct: pct,
       };

@@ -36,7 +36,9 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
         take: 5,
       });
 
-      console.log(`\n  Real DB has ${realListings.length} listings (sampled 5)`);
+      console.log(
+        `\n  Real DB has ${realListings.length} listings (sampled 5)`,
+      );
 
       // Now test the API endpoint
       const response = await request(app.getHttpServer())
@@ -97,7 +99,10 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
       console.log('  Real dealType distribution:', JSON.stringify(dealTypes));
 
       // Verify we have some classified deals (not all null)
-      const classifiedCount = Object.values(dealTypes).reduce((a, b) => a + b, 0);
+      const classifiedCount = Object.values(dealTypes).reduce(
+        (a, b) => a + b,
+        0,
+      );
       expect(classifiedCount).toBeGreaterThan(0);
     });
 
@@ -149,15 +154,19 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
 
   describe('Edge Cases - Real Data', () => {
     it('should handle database with data', async () => {
-      // Count real listings in DB
-      const count = await prisma.listing.count();
+      // v2 endpoint returns only GREAT/GOOD rows — compare against that gate
+      const count = await prisma.listing.count({
+        where: { dealType: { in: ['GREAT DEAL', 'GOOD DEAL'] } },
+      });
 
       const response = await request(app.getHttpServer())
         .get('/deals')
         .expect(200);
 
       expect(response.body.length).toBe(count);
-      console.log(`  DB has ${count} listings, API returned ${response.body.length}`);
+      console.log(
+        `  DB has ${count} deals (GREAT/GOOD), API returned ${response.body.length}`,
+      );
     });
 
     it('should return proper JSON structure', async () => {
