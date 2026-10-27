@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { CronService } from './scraper/cron.service';
+import { DealClassifierService } from './analysis/deal-classifier.service';
 import { PrismaService } from './prisma/prisma.service';
 
 // BigInt is not serializable by JSON.stringify by default.
@@ -26,6 +27,17 @@ async function bootstrap() {
       console.log('Running scrape...');
       await cronService.handleWeeklyScrape();
       console.log('Scrape complete');
+      await prismaService.$disconnect();
+      process.exit(0);
+    }
+
+    // ── Classify-only mode (backfill / post-deploy relabel) ──────
+    // Run: node dist/src/main.js --classify
+    if (process.argv.includes('--classify')) {
+      console.log('Classify-only mode: re-classifying listings in place...');
+      const dealClassifierService = app.get(DealClassifierService);
+      const n = await dealClassifierService.classifyDeals();
+      console.log(`Classified ${n}`);
       await prismaService.$disconnect();
       process.exit(0);
     }
