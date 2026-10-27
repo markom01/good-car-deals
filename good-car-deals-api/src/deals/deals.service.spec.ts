@@ -197,7 +197,8 @@ describe('DealsService.getDeals (v2 gate + pooled average)', () => {
         };
         // second call = pool fetch (no dealType gate) — rows are
         // tier-agnostic by construction
-        return 'expectedPrice' in args?.where &&
+        return args?.where !== undefined &&
+          'expectedPrice' in args.where &&
           Object.keys(args.where).length === 3
           ? poolRows
           : mainRows.filter((r) => r.mileageKm !== null && pred(r.dealType));
@@ -210,7 +211,10 @@ describe('DealsService.getDeals (v2 gate + pooled average)', () => {
     const result = await service.getDeals();
 
     // Gate sent to the DB is exactly the v2 pair
-    expect(findMany.mock.calls[0]![0]!.where.dealType).toEqual({
+    expect(
+      (findMany.mock.calls[0]?.[0] as { where: { dealType: unknown } }).where
+        .dealType,
+    ).toEqual({
       in: ['GREAT DEAL', 'GOOD DEAL'],
     });
     expect(result.map((r) => r.id)).toEqual([1, 2, 5]);
