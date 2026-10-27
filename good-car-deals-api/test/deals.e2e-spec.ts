@@ -154,9 +154,15 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
 
   describe('Edge Cases - Real Data', () => {
     it('should handle database with data', async () => {
-      // v2 endpoint returns only GREAT/GOOD rows — compare against that gate
+      // v2 endpoint returns only gated rows — compare against the
+      // service's own where clause
       const count = await prisma.listing.count({
-        where: { dealType: { in: ['GREAT DEAL', 'GOOD DEAL'] } },
+        where: {
+          dealType: { in: ['GREAT DEAL', 'GOOD DEAL'] },
+          year: { not: null },
+          title: { not: '' },
+          mileageKm: { not: null },
+        },
       });
 
       const response = await request(app.getHttpServer())

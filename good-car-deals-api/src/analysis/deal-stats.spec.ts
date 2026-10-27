@@ -116,4 +116,13 @@ describe('cellMedianExpected fallback', () => {
     ));
   it('returns null below 3 rows in window', () =>
     expect(cellMedianExpected([cells.rows[0]], 2012, 200000)).toBeNull());
+
+  it('medians IQR-trimmed prices (part-out inside the km window does not shift the median)', () => {
+    const withPartout: PriceRow[] = [
+      ...cells.rows,
+      { price: 100, year: 2012, km: 205000 },
+    ];
+    // Raw median would be 5250; IQR-trimmed median is 5300.
+    expect(cellMedianExpected(withPartout, 2012, 200000)).toBe(5300);
+  });
 });

@@ -164,11 +164,10 @@ export class DealClassifierService {
   async classifyDeals(): Promise<number> {
     this.logger.log('Starting deal classification...');
 
-    // Fetch all listings with a price (rows without year/km still get
-    // updated, to UNRATED + score 0).
-    const listings = await this.prismaService.listing.findMany({
-      where: { priceNumeric: { not: null } },
-    });
+    // Fetch ALL listings: rows whose price turned non-numeric (e.g.
+    // "Price on request") must still be re-labeled in place — otherwise
+    // they keep a stale GREAT/GOOD label from a previous pass.
+    const listings = await this.prismaService.listing.findMany({});
 
     if (listings.length === 0) {
       this.logger.warn('No listings found to classify');

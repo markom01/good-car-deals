@@ -173,6 +173,29 @@ describe('classifyGroups', () => {
     });
   });
 
+  it('price-null row inside a healthy group → UNRATED (no stale label)', () => {
+    const stalePriceRow: ClassifierRow = {
+      id: 904,
+      model: 'Astra J',
+      priceNumeric: null,
+      year: 2015,
+      age: 11,
+      mileageKm: 120000,
+    };
+    const out = classifyGroups([
+      ...makeMarketRows(),
+      belowMarketRow(),
+      partOutRow(),
+      stalePriceRow,
+    ]);
+    expect(out.find((r) => r.id === 904)).toMatchObject({
+      dealType: 'UNRATED',
+      dealScore: 0,
+      expectedPrice: null,
+      deviationPct: null,
+    });
+  });
+
   it('two model groups never share a fit (Astra J + Astra H rows with offset price levels)', () => {
     const jRows = makeGroupRows('Astra J', 0);
     const hRows = makeGroupRows('Astra H', 2000);

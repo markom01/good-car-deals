@@ -84,12 +84,29 @@ export function extractModel(title: string): string | null {
 /**
  * Parse engine displacement string to cubic centimeters
  * Input: "1956 cm3" → 1956
+ * Input: "1.956 cm3" → 1956 (dot-thousands separator)
+ * Input: "1.6L" → 1600 (liter notation, decimal × 1000)
  * Input: "1598" → 1598
  * Input: "" / garbage → null
  */
 export function parseEngineCc(engineVolume: string | null): number | null {
   if (!engineVolume) return null;
-  const parsed = parseInt(engineVolume.match(/-?\d+(\.\d+)?/)?.[0] ?? '', 10);
+
+  const trimmed = engineVolume.trim();
+
+  // Liter notation: decimal liters → cc (×1000)
+  if (/l$/i.test(trimmed)) {
+    const liters = parseFloat(trimmed.replace(/l/i, ''));
+    return isNaN(liters) ? null : Math.round(liters * 1000);
+  }
+
+  // cc / plain digits: dots are thousands separators here, not decimals
+  const cleaned = trimmed.replace(/\./g, '');
+  const match = cleaned.match(/\d+/);
+
+  if (!match) return null;
+
+  const parsed = parseInt(match[0], 10);
   return isNaN(parsed) ? null : parsed;
 }
 

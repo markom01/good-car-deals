@@ -166,7 +166,12 @@ export function cellMedianExpected(
   const inKm = inYear.filter(
     (r) => r.km >= targetKm * 0.8 && r.km <= targetKm * 1.2,
   );
-  return inKm.length >= 3
-    ? median(inKm.map((r) => r.price))
-    : median(inYear.map((r) => r.price));
+  // Median over IQR-trimmed prices (design doc §1: a part-out inside the
+  // window must not shift the median).
+  if (inKm.length >= 3) {
+    const kept = iqrTrimmed(inKm.map((r) => r.price)).kept;
+    return kept.length > 0 ? median(kept) : null;
+  }
+  const keptYear = iqrTrimmed(inYear.map((r) => r.price)).kept;
+  return keptYear.length > 0 ? median(keptYear) : null;
 }

@@ -68,6 +68,14 @@ describe('parseEngineCc', () => {
     expect(parseEngineCc('')).toBeNull();
     expect(parseEngineCc('aka')).toBeNull();
   });
+
+  it('parses liter notation "1.6L" to 1600', () => {
+    expect(parseEngineCc('1.6L')).toBe(1600);
+  });
+
+  it('parses dot-thousands "1.956 cm3" to 1956', () => {
+    expect(parseEngineCc('1.956 cm3')).toBe(1956);
+  });
 });
 
 describe('parsePowerKw', () => {
