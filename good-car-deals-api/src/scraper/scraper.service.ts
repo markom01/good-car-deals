@@ -18,21 +18,32 @@ export class ScraperService {
   ) {}
 
   /**
-   * Scrape all target model listings from pages 1-15
+   * Scrape all target model listings (up to maxPages).
+   * Page 1 is fetched from the configured URL, follow-up pages are
+   * discovered from the site's own pagination links (robust against
+   * slug changes), falling back to built URLs when none are found.
    * @returns Array of raw listing data (deduplicated by listingUrl)
    */
   async scrapeTargetModel(): Promise<RawListingData[]> {
     const allListings: RawListingData[] = [];
+    const visited = new Set<string>();
+    const queue: string[] = [this.httpService.buildSearchUrl(1)];
     let successCount = 0;
     let failCount = 0;
     const model = this.configService.get<string>('scraper.model')!;
 
     this.logger.log(`Starting scrape of ${model} listings...`);
 
-    for (let page = 1; page <= this.maxPages; page++) {
+    while (queue.length > 0 && visited.size < this.maxPages) {
+      const url = queue.shift()!;
+      if (visited.has(url)) {
+        continue;
+      }
+      visited.add(url);
+      const pageNum = visited.size;
+
       try {
-        const url = this.httpService.buildSearchUrl(page);
-        this.logger.log(`Scraping page ${page}/${this.maxPages}: ${url}`);
+        this.logger.log(`Scraping page ${pageNum}/${this.maxPages}: ${url}`);
 
         const html = await this.httpService.fetchPage(url);
         const pageListings = this.htmlParserService.parsePage(html);
@@ -40,12 +51,29 @@ export class ScraperService {
         allListings.push(...pageListings);
         successCount++;
 
+        // Discover follow-up pages from the site's own pagination links
+        for (const nextUrl of this.htmlParserService.extractSearchPageUrls(
+          html,
+        )) {
+          if (!visited.has(nextUrl) && !queue.includes(nextUrl)) {
+            queue.push(nextUrl);
+          }
+        }
+        // Fallback: no pagination links found (markup drift) —
+        // continue with the next built URL
+        if (queue.length === 0 && visited.size < this.maxPages) {
+          const fallback = this.httpService.buildSearchUrl(pageNum + 1);
+          if (!visited.has(fallback)) {
+            queue.push(fallback);
+          }
+        }
+
         // Small delay between pages to be polite
         await this.sleep(1000);
       } catch (error) {
         failCount++;
         this.logger.warn(
-          `Failed to scrape page ${page}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          `Failed to scrape page ${pageNum} (${url}): ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
         // Continue to next page on error
       }
@@ -73,11 +101,23 @@ export class ScraperService {
     const model = this.configService.get<string>('scraper.model')!;
 
     this.logger.log(`Saving ${listings.length} listings to database...`);
+    let expiredCount = 0;
 
     for (const raw of listings) {
       try {
+        // Skip listings that no longer resolve to their detail page
+        // (expired ads redirect to the generic search page).
+        const live = await this.httpService.isListingLive(raw.listingUrl);
+        if (!live) {
+          expiredCount++;
+          this.logger.debug(`Skipping expired listing: ${raw.listingUrl}`);
+          continue;
+        }
+
         // Normalize mileage
-        const mileageKm = this.htmlParserService.normalizeMileage(raw.mileageKm);
+        const mileageKm = this.htmlParserService.normalizeMileage(
+          raw.mileageKm,
+        );
 
         // Normalize price
         const priceData = this.htmlParserService.normalizePrice(raw.price);
@@ -127,6 +167,9 @@ export class ScraperService {
       }
     }
 
+    if (expiredCount > 0) {
+      this.logger.log(`Skipped ${expiredCount} expired listings`);
+    }
     this.logger.log(`Saved ${savedListings.length} listings to database`);
     return savedListings;
   }

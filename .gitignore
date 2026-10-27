@@ -15,3 +15,6 @@ __pycache__/
 
 # Local scraper script
 scrape-local.bat
+
+# CodeGraph index (regenerable)
+.codegraph/

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugins": [
+    {
+      "package": "github:vercel/vercel-plugin",
+      "options": {
+        "telemetry": false
+      }
+    }
+  ],
+  "mcp": {
+    "servers": {
+      "next-devtools": {
+        "type": "local",
+        "command": ["npx", "-y", "next-devtools-mcp@latest"],
+        "cwd": "good-car-deals-frontend",
+        "environment": {
+          "NEXT_TELEMETRY_DISABLED": "1"
+        }
+      },
+      "prisma": {
+        "type": "local",
+        "command": ["npx", "prisma", "mcp"],
+        "cwd": "good-car-deals-api",
+        "environment": {
+          "PRISMA_HIDE_UPDATE_MESSAGE": "1"
+        }
+      },
+      "shadcn": {
+        "type": "local",
+        "command": ["npx", "shadcn", "mcp"],
+        "cwd": "good-car-deals-frontend"
+      }
+    }
+  }
+}

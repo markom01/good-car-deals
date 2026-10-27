@@ -13,7 +13,8 @@ describe('HttpService - Real Data Tests (NO MOCKS)', () => {
           provide: ConfigService,
           useValue: {
             get: (key: string) => {
-              if (key === 'scraper.targetUrl') return 'https://www.polovniautomobili.com/auto-oglasi/pretraga';
+              if (key === 'scraper.targetUrl')
+                return 'https://www.polovniautomobili.com/auto-oglasi/pretraga';
               if (key === 'scraper.brand') return 'opel';
               if (key === 'scraper.model') return 'Astra J';
               return undefined;
@@ -59,10 +60,19 @@ describe('HttpService - Real Data Tests (NO MOCKS)', () => {
       console.log(`  Successfully fetched ${results.length} real pages`);
     }, 60000); // 60s timeout for multiple real HTTP calls
 
+    it('should build canonical search URLs (pagination-safe)', () => {
+      // Lowercase/hyphenated slugs silently return page 1 content for
+      // every page number — the builder must mirror the site's links.
+      const url2 = httpService.buildSearchUrl(2);
+      expect(url2).toBe(
+        'https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=Opel&model[]=Astra+J&page=2&sort=basic&damaged[]=notDamaged&onlyWithPrice=true&showOldNew=old',
+      );
+    });
+
     it('should build correct search URL', () => {
       const url1 = httpService.buildSearchUrl(1);
       expect(url1).toContain('page=1');
-      // New format: brand=opel&model[]=astra-j&page=1 (array syntax)
+      // Canonical format: brand=Opel&model[]=Astra+J&page=N&sort=basic
       expect(url1).toContain('brand=');
       expect(url1).toContain('model[]=');
 
@@ -83,7 +93,9 @@ describe('HttpService - Real Data Tests (NO MOCKS)', () => {
       } catch (error) {
         // Expected to throw after retries
         expect(error).toBeDefined();
-        console.log(`  Expected error for invalid URL: ${(error as Error).message.substring(0, 50)}`);
+        console.log(
+          `  Expected error for invalid URL: ${(error as Error).message.substring(0, 50)}`,
+        );
       }
     }, 30000);
   });

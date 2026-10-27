@@ -87,17 +87,53 @@ export class HttpService {
   }
 
   /**
-   * Build search URL with brand/model
+   * Probe a listing detail URL and decide whether the ad is still live.
+   * Expired ads no longer resolve to their detail page: the site
+   * redirects them to the generic search page (brand/model facet URL),
+   * so the final URL loses the ad id path segment.
+   * Returns false only when a redirect is confirmed. Transient errors
+   * (403 challenge, timeout, network) count as live, so a single
+   * hiccup cannot drop a good listing — the next run probes it again.
+   * @param url - The listing detail URL (canonical, without tracking params)
+   * @returns true when the listing is live (or liveness could not be verified)
+   */
+  async isListingLive(url: string): Promise<boolean> {
+    const adId = url.match(/\/auto-oglasi\/(\d+)/)?.[1];
+    // No ad id → nothing to verify against; keep the listing.
+    if (!adId) return true;
+
+    try {
+      const response = await this.impit.fetch(url, {
+        headers: this.headers,
+        timeout: this.timeout,
+      });
+      // Live detail pages keep /auto-oglasi/<adId>/ in the final URL;
+      // expired ones redirect to a query-less facet URL without the id.
+      const finalUrl = response.url ?? url;
+      return new RegExp(`/auto-oglasi/${adId}(/|\\?|$)`).test(finalUrl);
+    } catch {
+      return true; // Cannot verify — assume live.
+    }
+  }
+
+  /**
+   * Build search URL with brand/model.
+   * Mirrors the site's canonical link format exactly
+   * (e.g. ?brand=Opel&model[]=Astra+J&page=2&sort=basic):
+   * lowercase/hyphenated slugs return page 1 content for every
+   * page number, so case and spacing must be preserved.
    * @param page - Page number (1-based)
    * @returns The constructed URL
    */
   buildSearchUrl(page: number): string {
     const separator = this.baseUrl.includes('?') ? '&' : '?';
-    const modelParam = this.model.toLowerCase().replace(/\s+/g, '-');
-    const brandParam = this.brand.toLowerCase().replace(/\s+/g, '-');
+    // Preserve model spacing as "+" (site canonical form, not hyphenated)
+    const modelParam = this.model.trim().replace(/\s+/g, '+');
+    // Capitalize brand ("opel" → "Opel"), keep the rest untouched
+    // so already-correct values ("BMW") survive
+    const brandParam = this.brand.charAt(0).toUpperCase() + this.brand.slice(1);
 
-    // Build URL with brand/model[]/page (array syntax for model)
-    return `${this.baseUrl}${separator}brand=${brandParam}&model[]=${modelParam}&page=${page}`;
+    return `${this.baseUrl}${separator}brand=${brandParam}&model[]=${modelParam}&page=${page}&sort=basic&damaged[]=notDamaged&onlyWithPrice=true&showOldNew=old`;
   }
 
   /**
