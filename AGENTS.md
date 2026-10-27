@@ -22,12 +22,12 @@ Local PC (Windows Task Scheduler — weekly Sunday 00:00)
                       └─ Vercel (free) serves Next.js frontend → CDN
 ```
 
-| Layer | Hosting | URL | Notes |
-|-------|---------|-----|-------|
-| Frontend | Vercel (free) | https://good-car-deals-frontend.vercel.app | Static pages via Next.js |
-| API | Render (free tier) | https://good-car-deals-api.onrender.com | Spins down after 15 min idle, wakes on request |
-| Database | Neon (free tier) | Frankfurt region | 0.5 GB, 100 CU-hours/mo |
-| Scraper | Windows Task Scheduler | Local machine | Runs from home IP to avoid Cloudflare 403 |
+| Layer    | Hosting                | URL                                        | Notes                                          |
+| -------- | ---------------------- | ------------------------------------------ | ---------------------------------------------- |
+| Frontend | Vercel (free)          | https://good-car-deals-frontend.vercel.app | Static pages via Next.js                       |
+| API      | Render (free tier)     | https://good-car-deals-api.onrender.com    | Spins down after 15 min idle, wakes on request |
+| Database | Neon (free tier)       | Frankfurt region                           | 0.5 GB, 100 CU-hours/mo                        |
+| Scraper  | Windows Task Scheduler | Local machine                              | Runs from home IP to avoid Cloudflare 403      |
 
 ## STRUCTURE
 
@@ -45,17 +45,17 @@ good car deals/
 
 ## WHERE TO LOOK
 
-| Task | Location | Notes |
-|------|----------|-------|
-| REST endpoints | `good-car-deals-api/src/deals/` | Controller + service |
-| Scraping logic | `good-car-deals-api/src/scraper/` | HTTP client (impit), HTML parser (cheerio) |
-| Deal classification | `good-car-deals-api/src/analysis/` | `deal-classifier.service.ts` |
-| DB schema | `good-car-deals-api/prisma/schema.prisma` | Single `Listing` model |
-| Frontend pages | `good-car-deals-frontend/src/app/` | App Router (layout, page) |
-| UI components | `good-car-deals-frontend/src/components/` | Custom + shadcn/ui primitives |
-| Shared types | `packages/shared/src/index.ts` | `Listing` interface |
-| Dev run | Root `package.json` — `npm run dev` | concurrently runs API + frontend |
-| Startup behavior | `good-car-deals-api/src/main.ts` | `--scrape` flag, `SKIP_STARTUP_SCRAPE` env var |
+| Task                | Location                                  | Notes                                          |
+| ------------------- | ----------------------------------------- | ---------------------------------------------- |
+| REST endpoints      | `good-car-deals-api/src/deals/`           | Controller + service                           |
+| Scraping logic      | `good-car-deals-api/src/scraper/`         | HTTP client (impit), HTML parser (cheerio)     |
+| Deal classification | `good-car-deals-api/src/analysis/`        | `deal-classifier.service.ts`                   |
+| DB schema           | `good-car-deals-api/prisma/schema.prisma` | Single `Listing` model                         |
+| Frontend pages      | `good-car-deals-frontend/src/app/`        | App Router (layout, page)                      |
+| UI components       | `good-car-deals-frontend/src/components/` | Custom + shadcn/ui primitives                  |
+| Shared types        | `packages/shared/src/index.ts`            | `Listing` interface                            |
+| Dev run             | Root `package.json` — `npm run dev`       | concurrently runs API + frontend               |
+| Startup behavior    | `good-car-deals-api/src/main.ts`          | `--scrape` flag, `SKIP_STARTUP_SCRAPE` env var |
 
 ## CONVENTIONS
 
@@ -66,19 +66,20 @@ good car deals/
 - **Data**: TanStack React Query v5 for client-side data fetching
 - **DB**: Prisma with PostgreSQL — `BigInt` IDs, snake_case column mapping via `@map()`
 - **Scraping**: `impit` for HTTP + TLS fingerprint impersonation, `cheerio` for HTML parsing
+- **Deal scoring**: v2 comps-relative — per-model OLS/cell-median expected price → % deviation → 5-tier badge + 0–100 score (`good-car-deals-api/src/analysis/deal-stats.ts`)
 - **Residential proxy**: Optional — set `SCRAPER_PROXY_URL` env var if using a proxy service
 - **Monorepo**: npm workspaces, shared types package consumed from source (no build step)
 
 ## KEY ENVIRONMENT VARIABLES
 
-| Variable | Where | Purpose |
-|----------|-------|---------|
-| `DATABASE_URL` | Render + .env | Neon PostgreSQL connection string |
-| `SKIP_STARTUP_SCRAPE=true` | Render | Don't scrape on Render (gets 403) |
-| `SCRAPER_TARGET_URL` | .env | polovniautomobili.com search URL |
-| `SCRAPER_BRAND` | .env | Car brand to search |
-| `SCRAPER_MODEL` | .env | Car model to search |
-| `NEXT_PUBLIC_API_URL` | Vercel | Frontend → API URL |
+| Variable                   | Where         | Purpose                           |
+| -------------------------- | ------------- | --------------------------------- |
+| `DATABASE_URL`             | Render + .env | Neon PostgreSQL connection string |
+| `SKIP_STARTUP_SCRAPE=true` | Render        | Don't scrape on Render (gets 403) |
+| `SCRAPER_TARGET_URL`       | .env          | polovniautomobili.com search URL  |
+| `SCRAPER_BRAND`            | .env          | Car brand to search               |
+| `SCRAPER_MODEL`            | .env          | Car model to search               |
+| `NEXT_PUBLIC_API_URL`      | Vercel        | Frontend → API URL                |
 
 ## ANTI-PATTERNS (THIS PROJECT)
 

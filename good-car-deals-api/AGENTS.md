@@ -42,21 +42,24 @@ src/
 
 ## DEAL CLASSIFICATION
 
-Two methods in `deal-classifier.service.ts`:
+v2 comps-relative scoring in `deal-classifier.service.ts` + pure math in `src/analysis/deal-stats.ts`:
 
-- **Price-per-year ranking** — Sorts by `priceNumeric / age` ascending. Top 20% = GOOD DEAL, 20-50% = DECENT DEAL, bottom 50% = OVERPRICED.
-- **Market average comparison** — Calculates model-level avg price/year (needs 3+ listings). <80% of avg = GOOD DEAL (Market), <95% = DECENT DEAL (Market). Overrides rank-based result when better.
-- **Deal score** — `max(0, 100 - pricePerYear / 100)`.
+- **Per-model expected price** — Rows group by the persisted `model` column (no title re-extraction). Per group, try an OLS fit `price ≈ intercept + coefAge·age + coefKm·km` on Tukey-IQR-trimmed rows (min 12 survivors, singular-matrix and wrong-sign guards; `n` = rows actually used). Rows trimmed by the trim are still scored — no cap.
+- **Cell-median fallback** — Fit fails (thin group) → per-row expected price from `year±1` comps, split to `km±20%` when ≥3 rows survive the split, else the plain `year±1` median; below 3 comps → `UNRATED`.
+- **Deviation → score → tier** — `deviationPct = (expected − ask) / expected × 100` (positive = cheaper than expected); `dealScore = clamp(round(50 + dev·4), 0..100)`; bands: `≥ +10` GREAT DEAL, `[+4, +10)` GOOD DEAL, `(−4, +4)` FAIR PRICE, `[−10, −4]` HIGH PRICE, `≤ −10` OVERPRICED. Missing year/km/price or non-positive expected price → `UNRATED` with score 0.
+- **Persistence** — Each pass writes `dealType`, `dealScore`, `expectedPrice`, `deviationPct` (+ keeps `pricePerYear` for display/sort compat).
+- **CLI** — Re-run classification without scraping: `node dist/src/main.js --classify` (one-shot, mutates DB labels in place, then exits).
+- **Deploy note** — Render boot (`prisma db push` + `SKIP_STARTUP_SCRAPE=true`) picks up the v2 columns automatically; first `/deals` after deploy returns [] until `node dist/src/main.js --classify` runs.
 
 ## KEY FILES
 
-| File | Role |
-|------|------|
-| `app.module.ts` | Root module, imports ConfigModule.forRoot (with validate), ScheduleModule.forRoot, Prisma, Scraper, Analysis, Deals |
-| `main.ts` | `BigInt.prototype.toJSON`, `enableCors()`, `--scrape` CLI flag, `SKIP_STARTUP_SCRAPE` env var |
-| `cron.service.ts` | `@Cron(CronExpression.EVERY_WEEK)` — entry point for full pipeline |
-| `src/config/validation.schema.ts` | 5 required env vars (DATABASE_URL, SCRAPER_TARGET_URL, SCRAPER_BRAND, SCRAPER_MODEL, SCRAPER_CRON_SCHEDULE) |
-| `prisma/schema.prisma` | Single `Listing` model — BigInt id, snake_case via `@map()`, table `listings` |
+| File                              | Role                                                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `app.module.ts`                   | Root module, imports ConfigModule.forRoot (with validate), ScheduleModule.forRoot, Prisma, Scraper, Analysis, Deals |
+| `main.ts`                         | `BigInt.prototype.toJSON`, `enableCors()`, `--scrape` CLI flag, `SKIP_STARTUP_SCRAPE` env var                       |
+| `cron.service.ts`                 | `@Cron(CronExpression.EVERY_WEEK)` — entry point for full pipeline                                                  |
+| `src/config/validation.schema.ts` | 5 required env vars (DATABASE_URL, SCRAPER_TARGET_URL, SCRAPER_BRAND, SCRAPER_MODEL, SCRAPER_CRON_SCHEDULE)         |
+| `prisma/schema.prisma`            | Single `Listing` model — BigInt id, snake_case via `@map()`, table `listings`                                       |
 
 ## TESTS
 
