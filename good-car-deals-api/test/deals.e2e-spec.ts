@@ -146,9 +146,7 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
     });
 
     it('should return 400 for invalid sort parameter', async () => {
-      const response = await request(app.getHttpServer())
-        .get('/deals?sort=invalid')
-        .expect(400);
+      await request(app.getHttpServer()).get('/deals?sort=invalid').expect(400);
     });
   });
 

@@ -185,25 +185,23 @@ describe('DealsService.getDeals (v2 gate + pooled average)', () => {
   it('returns only GREAT/GOOD rows with new fields mapped and pooled averages', async () => {
     // Mock emulates the DB: filters by the where clause the service sends,
     // so a wrong gate (e.g. startsWith 'GOOD DEAL') is caught here.
-    const findMany = jest.fn(
-      async (args?: { where?: { dealType?: unknown } }) => {
-        const gate = args?.where?.dealType;
-        const pred = (dealType: string | null): boolean => {
-          if (!gate || typeof gate !== 'object') return true;
-          const g = gate as { in?: string[]; startsWith?: string };
-          if (g.in) return g.in.includes(dealType ?? '');
-          if (g.startsWith) return (dealType ?? '').startsWith(g.startsWith);
-          return true;
-        };
-        // second call = pool fetch (no dealType gate) — rows are
-        // tier-agnostic by construction
-        return args?.where !== undefined &&
-          'expectedPrice' in args.where &&
-          Object.keys(args.where).length === 3
-          ? poolRows
-          : mainRows.filter((r) => r.mileageKm !== null && pred(r.dealType));
-      },
-    );
+    const findMany = jest.fn((args?: { where?: { dealType?: unknown } }) => {
+      const gate = args?.where?.dealType;
+      const pred = (dealType: string | null): boolean => {
+        if (!gate || typeof gate !== 'object') return true;
+        const g = gate as { in?: string[]; startsWith?: string };
+        if (g.in) return g.in.includes(dealType ?? '');
+        if (g.startsWith) return (dealType ?? '').startsWith(g.startsWith);
+        return true;
+      };
+      // second call = pool fetch (no dealType gate) — rows are
+      // tier-agnostic by construction
+      return args?.where !== undefined &&
+        'expectedPrice' in args.where &&
+        Object.keys(args.where).length === 3
+        ? poolRows
+        : mainRows.filter((r) => r.mileageKm !== null && pred(r.dealType));
+    });
     const service = new DealsService({
       listing: { findMany },
     } as unknown as PrismaService);

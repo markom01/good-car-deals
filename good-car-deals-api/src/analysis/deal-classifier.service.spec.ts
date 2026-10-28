@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { HttpService } from '../scraper/http.service';
 import { HtmlParserService } from '../scraper/html-parser.service';
 import { AppModule } from '../app.module';
@@ -47,7 +46,9 @@ describe('Real Flow E2E Test - Scrape → Parse', () => {
 
       // Test normalization on real data
       for (const listing of listings.slice(0, 3)) {
-        const normalized = htmlParserService.normalizeMileage(listing.mileageKm);
+        const normalized = htmlParserService.normalizeMileage(
+          listing.mileageKm,
+        );
         console.log(`  Mileage: "${listing.mileageKm}" -> ${normalized}`);
         expect(normalized).toBeDefined();
       }

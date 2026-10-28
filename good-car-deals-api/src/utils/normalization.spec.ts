@@ -2,7 +2,6 @@ import {
   normalizeMileage,
   normalizePrice,
   extractModel,
-  calculateAge,
   parseEngineCc,
   parsePowerKw,
 } from './normalization';
@@ -32,7 +31,7 @@ describe('normalizeMileage', () => {
   it('should return null for invalid mileage', () => {
     expect(normalizeMileage('N/A')).toBeNull();
     expect(normalizeMileage('')).toBeNull();
-    expect(normalizeMileage(null as unknown as string)).toBeNull();
+    expect(normalizeMileage(null)).toBeNull();
   });
 });
 
@@ -51,7 +50,7 @@ describe('normalizePrice', () => {
   it('should return null for invalid price', () => {
     expect(normalizePrice('Price on request').numeric).toBeNull();
     expect(normalizePrice('').numeric).toBeNull();
-    expect(normalizePrice(null as unknown as string).numeric).toBeNull();
+    expect(normalizePrice(null).numeric).toBeNull();
   });
 });
 

@@ -2,7 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import { HtmlParserService, RawListingData } from './html-parser.service';
+import { HtmlParserService } from './html-parser.service';
+import * as cheerio from 'cheerio';
 
 describe('HtmlParserService - Real Data Tests (NO MOCKS)', () => {
   let htmlParserService: HtmlParserService;
@@ -14,7 +15,12 @@ describe('HtmlParserService - Real Data Tests (NO MOCKS)', () => {
 
   beforeAll(() => {
     // Load REAL HTML from evidence folder (actual scraped pages)
-    const evidencePath = path.join(process.cwd(), '..', '.sisyphus', 'evidence');
+    const evidencePath = path.join(
+      process.cwd(),
+      '..',
+      '.sisyphus',
+      'evidence',
+    );
 
     // Sample listing HTML (featured)
     const samplePath = path.join(evidencePath, 'sample-listing.html');
@@ -61,7 +67,8 @@ describe('HtmlParserService - Real Data Tests (NO MOCKS)', () => {
           provide: ConfigService,
           useValue: {
             get: (key: string) => {
-              if (key === 'scraper.targetUrl') return 'https://www.polovniautomobili.com/auto-oglasi/pretraga';
+              if (key === 'scraper.targetUrl')
+                return 'https://www.polovniautomobili.com/auto-oglasi/pretraga';
               return undefined;
             },
           },
@@ -79,7 +86,9 @@ describe('HtmlParserService - Real Data Tests (NO MOCKS)', () => {
         return;
       }
       expect(realFeaturedHtml.length).toBeGreaterThan(100);
-      console.log(`\n  Loaded real featured HTML: ${realFeaturedHtml.length} chars`);
+      console.log(
+        `\n  Loaded real featured HTML: ${realFeaturedHtml.length} chars`,
+      );
     });
 
     it('should parse featured listing (REAL HTML)', () => {
@@ -87,7 +96,7 @@ describe('HtmlParserService - Real Data Tests (NO MOCKS)', () => {
         console.log('  Skipping - no sample-listing.html evidence available');
         return;
       }
-      const $ = require('cheerio').load(realFeaturedHtml);
+      const $ = cheerio.load(realFeaturedHtml);
       const listing = $('section[class*="classified"]');
 
       const result = htmlParserService.parseListing(listing, 'featured');
@@ -95,11 +104,13 @@ describe('HtmlParserService - Real Data Tests (NO MOCKS)', () => {
       expect(result).toBeDefined();
       expect(result.title).toBeTruthy();
       expect(result.listingUrl).toContain('polovniautomobili.com');
-      console.log(`  Parsed featured listing: "${result.title.substring(0, 40)}..."`);
+      console.log(
+        `  Parsed featured listing: "${result.title.substring(0, 40)}..."`,
+      );
     });
 
     it('should parse regular listing (REAL HTML)', () => {
-      const $ = require('cheerio').load(realRegularHtml);
+      const $ = cheerio.load(realRegularHtml);
       const listing = $('article[class*="classified"]');
 
       const result = htmlParserService.parseListing(listing, 'regular');
@@ -107,7 +118,9 @@ describe('HtmlParserService - Real Data Tests (NO MOCKS)', () => {
       expect(result).toBeDefined();
       expect(result.title).toContain('Test Model');
       expect(result.price).toBe('4500');
-      console.log(`  Parsed regular listing: "${result.title}", price: ${result.price}`);
+      console.log(
+        `  Parsed regular listing: "${result.title}", price: ${result.price}`,
+      );
     });
   });
 
