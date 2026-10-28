@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { CronService } from './scraper/cron.service';
 import { DealClassifierService } from './analysis/deal-classifier.service';
@@ -14,7 +15,11 @@ import { PrismaService } from './prisma/prisma.service';
 async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
-    app.enableCors();
+    app.use(helmet());
+    // CORS_ORIGIN: comma-separated allowlist (e.g. the Vercel frontend).
+    // Unset → allow all origins (public read-only API).
+    const corsOrigin = process.env.CORS_ORIGIN?.split(',').map((s) => s.trim());
+    app.enableCors({ origin: corsOrigin ?? true });
 
     const prismaService = app.get(PrismaService);
     const cronService = app.get(CronService);

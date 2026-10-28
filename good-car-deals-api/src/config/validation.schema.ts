@@ -26,6 +26,11 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   SCRAPER_PROXY_URL?: string;
+
+  /** Optional comma-separated CORS allowlist (unset = allow all). */
+  @IsOptional()
+  @IsString()
+  CORS_ORIGIN?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

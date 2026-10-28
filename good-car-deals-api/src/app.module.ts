@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import configuration from './config/configuration';
 import { validate } from './config/validation.schema';
 import { PrismaModule } from './prisma/prisma.module';
@@ -17,6 +19,8 @@ import { AppService } from './app.service';
       load: [configuration],
       validate,
     }),
+    // Rate limit: 100 req/min per IP (public read-only API on Render free).
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     ScheduleModule.forRoot(),
     PrismaModule,
     ScraperModule,
@@ -24,6 +28,10 @@ import { AppService } from './app.service';
     DealsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, CronService],
+  providers: [
+    AppService,
+    CronService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}
