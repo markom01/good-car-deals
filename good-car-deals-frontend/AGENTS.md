@@ -5,20 +5,24 @@
 
 ## OVERVIEW
 
-Next.js 16 App Router frontend for "Good Car Deals". Fetches classified car listings from the NestJS API and renders them as scored deal cards. All data fetching is client-side via TanStack React Query.
+Next.js 16 App Router frontend for "Good Car Deals". Fetches classified car listings from the NestJS API and renders them as scored deal cards. All data fetching is client-side via TanStack React Query. Also hosts a demo/static `/wheelrank` page.
 
 ## STRUCTURE
 
 ```
 src/
 ├── app/
-│   ├── layout.tsx         # Root layout: Geist font, Providers wrapper, flex column
+│   ├── layout.tsx         # Root layout: Geist font, Providers wrapper, full metadata (OG/Twitter)
 │   ├── page.tsx           # Home page: heading + DealList
+│   ├── robots.ts          # Static robots.txt (allow all + sitemap pointer)
+│   ├── sitemap.ts         # Static sitemap.xml
+│   ├── wheelrank/         # Demo page: carousel of mock deals (next/image, mock-deals.ts)
 │   └── globals.css        # Tailwind v4 entry, CSS vars, @theme inline
 ├── components/
-│   ├── ui/                # shadcn primitives: button, card, badge, separator
+│   ├── ui/                # shadcn primitives: button, card, badge, separator, carousel, empty, skeleton
 │   ├── deal-card.tsx      # Presentational card: title, price, score, badge, link
-│   ├── deal-list.tsx      # Client component, calls useDeals(), renders grid
+│   ├── deal-card.test.tsx # Vitest + Testing Library tests (3)
+│   ├── deal-list.tsx      # Client component, calls useDeals(), loading/error/empty/grid states
 │   └── index.ts           # Re-exports DealCard, DealList
 ├── hooks/
 │   ├── use-deals.ts       # React Query hook: GET /deals, queryKey ['deals']
@@ -48,28 +52,30 @@ DealList is the only client boundary. Everything above stays as server component
 3. Query key: `["deals"]`. No pagination, filtering, or sorting on the client.
 4. Config: staleTime 5 min, retry 2, refetchOnWindowFocus false.
 5. No caching layer beyond React Query in-memory defaults. No persistence.
-6. DealList returns null while loading or on error. No loading, error, or empty states.
+6. DealList renders: skeleton grid while loading, error card with retry on failure, "no deals" Empty state when the array is empty.
 
 ## CONFIG
 
-| Setting | Value |
-|---------|-------|
-| Port | 3000 (Next.js default) |
-| API base | NEXT_PUBLIC_API_URL or localhost:3001 |
-| Tailwind | CSS-first via globals.css `@import "tailwindcss"` + `@theme inline` (no tailwind.config.ts) |
-| PostCSS | `@tailwindcss/postcss` plugin only |
-| shadcn style | radix-luma, baseColor taupe, CSS vars, RSC enabled |
-| shadcn aliases | @/components, @/lib/utils, @/hooks, @/components/ui |
-| Font | Geist (variable via next/font) |
-| TypeScript | strict, path aliases match shadcn aliases |
+| Setting        | Value                                                                                                        |
+| -------------- | ------------------------------------------------------------------------------------------------------------ |
+| Port           | 3000 (Next.js default)                                                                                       |
+| API base       | NEXT_PUBLIC_API_URL or localhost:3001                                                                        |
+| Tailwind       | CSS-first via globals.css `@import "tailwindcss"` + `@theme inline` (no tailwind.config.ts)                  |
+| PostCSS        | `@tailwindcss/postcss` plugin only                                                                           |
+| shadcn style   | radix-luma, baseColor taupe, CSS vars, RSC enabled                                                           |
+| shadcn aliases | @/components, @/lib/utils, @/hooks, @/components/ui                                                          |
+| Font           | Geist (variable via next/font)                                                                               |
+| TypeScript     | strict, path aliases match shadcn aliases                                                                    |
+| Tests          | Vitest + jsdom + @testing-library/react (`npm run test`; config `vitest.config.ts`, setup `vitest.setup.ts`) |
 
 ## WHAT'S MISSING
 
-- **Tests**: No test files, no test runner.
-- **Error states**: DealList returns null silently. No error boundary, no loading skeleton, no retry UI.
-- **Empty state**: No "no deals found" when array is empty.
-- **Loading**: No Suspense fallback or loading.tsx.
-- **Metadata**: Basic title/description only. No OG, no structured data.
-- **Accessibility**: No aria labels, no focus management, no keyboard nav.
-- **Performance**: No image optimization, no streaming, no ISR. All data client-side.
+- **Accessibility**: No aria labels, no focus management, no keyboard nav beyond native elements.
+- **Streaming/ISR**: All data client-side; no Suspense streaming or ISR caching of /deals.
+- **Deeper test coverage**: Only DealCard is tested; DealList, useDeals hook, and the wheelrank page are untested.
 - **Monorepo sharing**: No shared UI components or design tokens across packages. Only the `Listing` type is shared.
+
+## NOTES
+
+- `carousel.tsx` (wheelrank) carries a scoped `eslint-disable` for set-state-in-effect — embla's reInit requires it; don't "fix" blindly.
+- Canonical URLs in metadata/robots/sitemap come from `NEXT_PUBLIC_SITE_URL`, defaulting to the vercel.app domain.
