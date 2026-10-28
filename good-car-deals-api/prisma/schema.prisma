@@ -30,5 +30,9 @@ model Listing {
   scrapedAt    DateTime @default(now()) @map("scraped_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  @@index([dealScore])
+  @@index([dealType])
+  @@index([model])
+  @@index([scrapedAt])
   @@map("listings")
 }
