@@ -42,6 +42,9 @@ export interface ClassifierRow {
   year: number | null;
   age: number | null;
   mileageKm: number | null;
+  powerKw?: number | null;
+  fuelType?: string | null;
+  transmission?: string | null;
 }
 
 export interface ClassifyResult {
@@ -122,12 +125,19 @@ export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
         age: r.age!,
         km: r.mileageKm!,
         price: r.priceNumeric!,
+        kw: r.powerKw,
+        diesel: r.fuelType === 'Dizel',
+        auto: r.transmission === 'Automatic',
       })),
     );
 
     if (fit) {
       for (const r of usable) {
-        const exp = expectedPrice(fit, r.age!, r.mileageKm!);
+        const exp = expectedPrice(fit, r.age!, r.mileageKm!, {
+          kw: r.powerKw,
+          diesel: r.fuelType === 'Dizel',
+          auto: r.transmission === 'Automatic',
+        });
         results.set(r.id, scoreRow(r.id, exp, r.priceNumeric!));
       }
     } else {
@@ -193,6 +203,9 @@ export class DealClassifierService {
       year: l.year,
       age: l.age,
       mileageKm: l.mileageKm,
+      powerKw: l.powerKw,
+      fuelType: l.fuelType,
+      transmission: l.transmission,
     }));
 
     // Keep price_per_year populated for display/sorting compatibility.

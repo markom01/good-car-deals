@@ -1,5 +1,6 @@
 import {
   fitLinearPrice,
+  expectedPrice,
   dealScoreFromDeviation,
   classifyTier,
   cellMedianExpected,
@@ -120,6 +121,191 @@ describe('deviation → score and tier', () => {
     expect(classifyTier(-5)).toBe('HIGH PRICE');
     expect(classifyTier(-15)).toBe('OVERPRICED');
     expect(classifyTier(9.99)).toBe('GOOD DEAL');
+  });
+});
+
+describe('fitLinearPrice power/fuel/transmission terms', () => {
+  // Base generator (same as makeRows) + engine trim terms:
+  // price = 9625 - 255*age - 4.5*km + 25*kw + 300*diesel + 600*auto + noise.
+  // kw cycles 55..95 (5 values), diesel = 20/30 rows, auto = 10/30 rows
+  // ((i*7)%10 < 4 — hits the ≥10-per-class boundary exactly).
+  function makePowerRows(): {
+    age: number;
+    km: number;
+    price: number;
+    kw: number;
+    diesel: boolean;
+    auto: boolean;
+  }[] {
+    const rows = [];
+    for (let i = 0; i < 30; i++) {
+      const age = 8 + Math.floor(i / 3);
+      const km = 80 + (i % 3) * 110;
+      const kw = 55 + (i % 5) * 10;
+      const diesel = i % 3 !== 0;
+      const auto = (i * 7) % 10 < 4;
+      const noise = (i % 5) * 8 - 16;
+      rows.push({
+        age,
+        km,
+        kw,
+        diesel,
+        auto,
+        price: Math.round(
+          9625 -
+            255 * age -
+            4.5 * km +
+            25 * kw +
+            300 * Number(diesel) +
+            600 * Number(auto) +
+            noise,
+        ),
+      });
+    }
+    return rows;
+  }
+
+  it('recovers power, diesel and auto terms when both classes ≥ 10 rows', () => {
+    const m = fitLinearPrice(makePowerRows())!;
+    expect(m).not.toBeNull();
+    expect(m.coefKw).toBeGreaterThan(20);
+    expect(m.coefKw).toBeLessThan(30);
+    expect(m.coefDiesel).toBeGreaterThan(200);
+    expect(m.coefAuto).toBeGreaterThan(500);
+  });
+
+  it('expectedPrice applies kw/diesel/auto attrs (matches generator within 2%)', () => {
+    const m = fitLinearPrice(makePowerRows())!;
+    // Row i=5: age=9, km=300, kw=75, diesel=true, auto=false.
+    const gen = 9625 - 255 * 9 - 4.5 * 300 + 25 * 75 + 300;
+    const exp = expectedPrice(m, 9, 300, { kw: 75, diesel: true, auto: false });
+    // Deterministic RED: attrs must add ≈ the kw + diesel contribution.
+    const base =
+      m.intercept +
+      m.coefAge * 9 +
+      m.coefKm * 300 +
+      m.coefKw! * (m.meanKw ?? 0);
+    expect(Math.abs(exp - base - 300)).toBeLessThanOrEqual(0.02 * gen);
+    expect(Math.abs(exp - gen)).toBeLessThanOrEqual(0.02 * gen);
+  });
+
+  it('expectedPrice without attrs mean-imputes kW (kw=0 would understate)', () => {
+    const m = fitLinearPrice(makePowerRows())!;
+    // kw cycles 55..95 → fit-sample mean 75.
+    expect(m.meanKw).toBeCloseTo(75, 6);
+    const imputed =
+      m.intercept +
+      m.coefAge * 9 +
+      m.coefKm * 190 +
+      m.coefKw! * (m.meanKw ?? NaN);
+    expect(expectedPrice(m, 9, 190)).toBeCloseTo(imputed, 6);
+    expect(expectedPrice(m, 9, 190, { kw: null })).toBeCloseTo(imputed, 6);
+    // Explicit kw still applied verbatim, not imputed.
+    expect(expectedPrice(m, 9, 190, { kw: 75 })).toBeCloseTo(
+      m.intercept + m.coefAge * 9 + m.coefKm * 190 + m.coefKw! * 75,
+      6,
+    );
+  });
+
+  it('wrong-sign power term is dropped and the fit falls back to age+km', () => {
+    const rows = makePowerRows().map((r) => ({
+      ...r,
+      price: r.price - 50 * r.kw, // kills the positive kw signal
+    }));
+    const m = fitLinearPrice(rows)!;
+    expect(m).not.toBeNull();
+    expect(m.coefKw).toBeUndefined();
+    expect(m.coefAge).toBeLessThan(0);
+  });
+
+  it('dummy class below 10 rows is dropped, power term survives', () => {
+    const rows = makePowerRows().map((r, i) => ({
+      ...r,
+      auto: i % 15 === 0, // only 2 automatics
+    }));
+    const m = fitLinearPrice(rows)!;
+    expect(m).not.toBeNull();
+    expect(m.coefAuto).toBeUndefined();
+    expect(m.coefKw).toBeGreaterThan(20);
+  });
+
+  it('diesel class below 10 rows is dropped, auto term survives', () => {
+    const rows = makePowerRows().map((r, i) => ({
+      ...r,
+      diesel: i % 15 === 0, // only 2 diesels
+    }));
+    const m = fitLinearPrice(rows)!;
+    expect(m).not.toBeNull();
+    expect(m.coefDiesel).toBeUndefined();
+    expect(m.coefAuto).toBeGreaterThan(500);
+    expect(m.coefKw).toBeGreaterThan(20);
+  });
+
+  it('dummy guard runs on the kwRows fit sample, not on all usable rows', () => {
+    // kw present for i<13 (kwRows = 13): within that sample diesel has 8/5
+    // and auto 5/8 rows per class — both dummies fail the ≥10 guard even
+    // though the FULL 30-row sample qualifies (20/10 diesel, 10/20 auto).
+    // The fit must be kw-only on the 13 kwRows.
+    const rows = makePowerRows().map((r, i) =>
+      i < 13 ? r : { ...r, kw: null as unknown as number },
+    );
+    const m = fitLinearPrice(rows)!;
+    expect(m).not.toBeNull();
+    expect(m.coefKw).toBeGreaterThan(20);
+    expect(m.coefDiesel).toBeUndefined();
+    expect(m.coefAuto).toBeUndefined();
+    expect(m.n).toBe(13);
+  });
+
+  it('singular full spec (diesel collinear with kw) falls back to plain age+km', () => {
+    // diesel ≡ (kw === 95) with binary kw {55,95}: the dummy column is an
+    // exact linear function of [1, kw] → singular normal-equations matrix
+    // → the plain age+km spec on ALL usable rows is the fallback. Small km
+    // values keep elimination rounding far below the 1e-9 pivot threshold
+    // (raw 1e5-km data accumulates ~1e13 entries — see fitLinearPrice
+    // conditioning note).
+    const rows: {
+      age: number;
+      km: number;
+      price: number;
+      kw: number;
+      diesel: boolean;
+      auto: boolean;
+    }[] = [];
+    for (let i = 0; i < 30; i++) {
+      const age = 8 + Math.floor(i / 3);
+      const km = 1 + (i % 3);
+      const kw = i % 2 ? 95 : 55;
+      const diesel = kw === 95;
+      const noise = (i % 5) * 8 - 16;
+      rows.push({
+        age,
+        km,
+        kw,
+        diesel,
+        auto: i % 3 === 0,
+        price: Math.round(
+          9625 - 255 * age - 450 * km + 25 * kw + 600 * Number(diesel) + noise,
+        ),
+      });
+    }
+    const m = fitLinearPrice(rows)!;
+    expect(m).not.toBeNull();
+    expect(m.coefKw).toBeUndefined();
+    expect(m.coefDiesel).toBeUndefined();
+    expect(m.coefAuto).toBeUndefined();
+    expect(m.n).toBe(30);
+    expect(m.coefAge).toBeLessThan(0);
+  });
+
+  it('kw term used only when ≥ 12 rows carry kw (fit stays on all rows)', () => {
+    const rows = makePowerRows().map((r, i) =>
+      i < 8 ? r : { ...r, kw: null as unknown as number },
+    );
+    const m = fitLinearPrice(rows)!;
+    expect(m).not.toBeNull();
+    expect(m.coefKw).toBeUndefined();
+    expect(m.n).toBe(30);
   });
 });
 

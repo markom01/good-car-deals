@@ -230,4 +230,53 @@ describe('classifyGroups', () => {
       );
     }
   });
+
+  it('powerKw term: high-kw row priced without premium looks cheap, low-kw row priced at high-kw level looks expensive', () => {
+    // 10 age/km pairs; within each pair age+km are identical while kw is
+    // 60 vs 105 and the price carries the 25 €/kW premium → the kw
+    // coefficient is cleanly identified (no collinearity with age/km).
+    const rows: ClassifierRow[] = [];
+    let id = 1;
+    for (let p = 0; p < 10; p++) {
+      const age = 5 + p;
+      const kmThousands = 40 + ((p * 7) % 10) * 22; // unaligned with age
+      for (const kw of [60, 105]) {
+        rows.push({
+          id: id++,
+          model: 'Astra J',
+          priceNumeric: Math.round(
+            genPrice(age, kmThousands) + 25 * kw + ((p % 5) * 8 - 16),
+          ),
+          year: 2026 - age,
+          age,
+          mileageKm: kmThousands * 1000,
+          powerKw: kw,
+        });
+      }
+    }
+    // Probe A: 105 kW engine priced at the plain age+km generator (no premium)
+    // → kw-adjusted expectation is higher → positive deviation (cheap).
+    const probeHigh: ClassifierRow = {
+      ...belowMarketRow(),
+      powerKw: 105,
+      priceNumeric: Math.round(genPrice(8, 120)),
+    };
+    // Probe B: 60 kW engine priced WITH the 105 kW premium (+1125 €)
+    // → kw-adjusted expectation is the plain one → negative deviation.
+    const probeLow: ClassifierRow = {
+      ...belowMarketRow(),
+      id: 906,
+      powerKw: 60,
+      priceNumeric: Math.round(genPrice(8, 120) + 25 * (105 - 60)),
+    };
+    const out = classifyGroups([...rows, probeHigh, probeLow]);
+    const a = out.find((r) => r.id === BELOW_ID)!;
+    const b = out.find((r) => r.id === 906)!;
+    expect(a.deviationPct! - b.deviationPct!).toBeGreaterThan(5);
+    // kw term pushed the 105 kW expectation above the plain generator price
+    // and above the 60 kW expectation (absolute coefficient size is pinned
+    // in deal-stats.spec; here only ordering matters).
+    expect(a.expectedPrice!).toBeGreaterThan(genPrice(8, 120));
+    expect(a.expectedPrice!).toBeGreaterThan(b.expectedPrice!);
+  });
 });

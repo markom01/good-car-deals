@@ -38,7 +38,7 @@ Comps must key on **generation-inclusive model** — "Astra J", not "Astra". Sit
 
 Two estimators, chosen by row count for the model's whole dataset (all rows share the comp cell in single-model config):
 
-- **Regression (primary, ≥ 12 usable rows):** OLS `price ~ intercept + age + mileageKm`, fit in plain TypeScript (3×3 normal equations). Fit on IQR-trimmed prices (Q1 − 1.5·IQR … Q3 + 1.5·IQR). `expected(l) = a + b·age + c·km`.
+- **Regression (primary, ≥ 12 usable rows):** OLS `price ~ intercept + age + mileageKm [+ powerKw + diesel + automatic]`, fit in plain TypeScript (Gaussian elimination, 3–6 params). Fit on IQR-trimmed prices (Q1 − 1.5·IQR … Q3 + 1.5·IQR). `expected(l) = a + b·age + c·km` plus the surviving optional terms. Optional engine-trim terms, each behind a guard so a thin column can't destabilize the base fit: `coefKw` only when ≥ 12 usable rows carry kW (≥ 2 distinct values; wrong-sign ≤ 0 drops the term, fit re-runs as plain age+km); `coefDiesel` / `coefAuto` dummies only when BOTH classes hold ≥ 10 rows (empirical 2026-10-28 Corsa D run: LOO-MAPE 16.2% → 13.9% with kW; kW beats engineCc which is collinear r=0.74; auto n=9 → correctly excluded by the guard). Scoring convention: rows without a kW value are scored at the fit sample's mean kW (mean-imputation — kw=0 would understate them); missing dummy attributes count as the 0 side (mild: unknown fuel ≈ petrol).
 - **Cell median (fallback, 3–11 rows):** median of IQR-trimmed prices in the cell `model + generation + year ± 1, km ± 20%` (year cell mandatory; km split only if cell still ≥ 3 after split).
 
 Below 3 usable rows → **UNRATED** (no dealType/score beyond "unrated").
