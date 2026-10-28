@@ -134,9 +134,28 @@ export function deviationPct(expected: number, price: number): number {
   return ((expected - price) / expected) * 100;
 }
 
-/** 50 + dev*4 clamped to [0,100] and rounded. Positive dev → better score. */
+/** 50 + dev*4 clamped to [0,100] and rounded. Positive dev → better score.
+ * Kept for the absolute dealScore scale; the market percentile scale is
+ * `percentileScores`. */
 export function dealScoreFromDeviation(dev: number): number {
   return Math.max(0, Math.min(100, Math.round(50 + dev * 4)));
+}
+
+/**
+ * Market percentile score: each deviation's rank position mapped to 0..100.
+ * Best deviation → 100, worst → 0, single rated row → 50. Deterministic
+ * tie-break by input index (equal deviations get adjacent, distinct scores).
+ */
+export function percentileScores(devs: number[]): number[] {
+  const n = devs.length;
+  const order = devs
+    .map((_, i) => i)
+    .sort((a, b) => devs[a] - devs[b] || a - b);
+  const scores = new Array<number>(n);
+  for (let r = 0; r < n; r++) {
+    scores[order[r]!] = n === 1 ? 50 : Math.round((100 * r) / (n - 1));
+  }
+  return scores;
 }
 
 /**

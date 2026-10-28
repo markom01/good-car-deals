@@ -3,10 +3,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   cellMedianExpected,
   classifyTier,
-  dealScoreFromDeviation,
   deviationPct,
   expectedPrice,
   fitLinearPrice,
+  percentileScores,
   type TierName,
 } from './deal-stats';
 
@@ -80,10 +80,12 @@ function scoreRow(id: number, expected: number, price: number): ClassifyResult {
   if (!Number.isFinite(dev)) {
     return UNRATED_RESULT(id);
   }
+  // dealScore is provisional here (dev-based); classifyGroups overwrites it
+  // with the market percentile across ALL rated rows before returning.
   return {
     id,
     dealType: classifyTier(dev),
-    dealScore: dealScoreFromDeviation(dev),
+    dealScore: 0,
     expectedPrice: expected,
     deviationPct: dev,
   };
@@ -145,6 +147,14 @@ export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
       }
     }
   }
+
+  // dealScore = market percentile across ALL rated rows (global, not
+  // per-model): best deviation → 100, worst → 0, UNRATED stays 0.
+  const rated = [...results.values()].filter((r) => r.deviationPct !== null);
+  const scores = percentileScores(rated.map((r) => r.deviationPct!));
+  rated.forEach((r, i) => {
+    r.dealScore = scores[i]!;
+  });
 
   return [...results.values()];
 }

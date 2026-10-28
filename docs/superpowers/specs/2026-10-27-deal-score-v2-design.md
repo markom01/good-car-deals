@@ -55,7 +55,7 @@ Below 3 usable rows → **UNRATED** (no dealType/score beyond "unrated").
 
 `dev% = (expected − ask) / expected × 100` — positive = below expected.
 
-- **dealScore** = `clamp(50 + devPct × 4, 0, 100)` → at expected price 50, −10% (overpriced) → 10, +10% (below market) → 90. Ascending `dealScore desc` sort puts the best deal first.
+- **dealScore** = market percentile of `devPct` across all rated listings (global, integer 0–100): best deal → 100, median deal → 50, worst → 0. Tiers stay absolute (bands below); the score is the relative position in today's pool. Ascending `dealScore desc` sort puts the best deal first. Ties are expected at integer granularity (a few listings per point).
 - **dealType** badge from devPct:
   - `GREAT DEAL`: devPct ≥ 10
   - `GOOD DEAL`: 4 ≤ devPct < 10

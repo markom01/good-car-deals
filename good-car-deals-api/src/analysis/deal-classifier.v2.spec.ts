@@ -196,6 +196,25 @@ describe('classifyGroups', () => {
     });
   });
 
+  it('dealScore is a market percentile: distinct per rated row, best dev → 100, UNRATED stays 0', () => {
+    const out = classifyGroups([
+      ...makeMarketRows(),
+      belowMarketRow(),
+      partOutRow(),
+      noYearRow(),
+    ]);
+    const rated = out.filter((r) => r.deviationPct !== null);
+    const scores = rated.map((r) => r.dealScore);
+    expect(new Set(scores).size).toBe(scores.length); // no ties
+    const best = [...rated].sort(
+      (a, b) => b.deviationPct! - a.deviationPct!,
+    )[0];
+    expect(best.dealScore).toBe(100);
+    const worst = [...rated].sort((a, b) => a.dealScore - b.dealScore)[0];
+    expect(worst.dealScore).toBe(0);
+    expect(out.find((r) => r.id === 902)!.dealScore).toBe(0);
+  });
+
   it('two model groups never share a fit (Astra J + Astra H rows with offset price levels)', () => {
     const jRows = makeGroupRows('Astra J', 0);
     const hRows = makeGroupRows('Astra H', 2000);

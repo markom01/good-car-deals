@@ -3,6 +3,7 @@ import {
   dealScoreFromDeviation,
   classifyTier,
   cellMedianExpected,
+  percentileScores,
   type PriceRow,
 } from './deal-stats';
 
@@ -63,6 +64,24 @@ function buildCellRows(): {
     yearOnlyMedian: 4500,
   };
 }
+
+describe('percentileScores', () => {
+  it('maps rank position to 0..100 (median ≈ 50)', () => {
+    expect(percentileScores([10, 0, -5, 20])).toEqual([67, 33, 0, 100]);
+  });
+
+  it('ties get adjacent ranks, scores stay distinct', () => {
+    expect(percentileScores([5, 5, 10])).toEqual([0, 50, 100]);
+  });
+
+  it('single rated row sits mid-market (50)', () => {
+    expect(percentileScores([7])).toEqual([50]);
+  });
+
+  it('empty input → empty output', () => {
+    expect(percentileScores([])).toEqual([]);
+  });
+});
 
 describe('fitLinearPrice regression path', () => {
   const rows = makeRows();
