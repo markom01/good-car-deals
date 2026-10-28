@@ -18,3 +18,7 @@ scrape-local.bat
 
 # CodeGraph index (regenerable)
 .codegraph/
+
+# Local debug evidence + one-off scripts (never commit)
+good-car-deals-api/.sisyphus/
+good-car-deals-api/scripts/
