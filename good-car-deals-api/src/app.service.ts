@@ -9,7 +9,11 @@ export class AppService {
     return 'Good Car Deals API is running';
   }
 
-  async healthCheck(): Promise<{ status: string; database: string; timestamp: string }> {
+  async healthCheck(): Promise<{
+    status: string;
+    database: string;
+    timestamp: string;
+  }> {
     try {
       await this.prismaService.$queryRaw`SELECT 1`;
       return {

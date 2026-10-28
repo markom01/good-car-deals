@@ -24,8 +24,7 @@ export class HtmlParserService {
   private readonly baseUrl: string;
 
   constructor(private configService: ConfigService) {
-    this.baseUrl =
-      this.configService.get<string>('scraper.targetUrl')!;
+    this.baseUrl = this.configService.get<string>('scraper.targetUrl')!;
   }
 
   /**
@@ -39,9 +38,7 @@ export class HtmlParserService {
 
     // Current markup (styled-components, no stable classes):
     // one <article> per ad, identified by the title anchor testid.
-    const cards = $(
-      'article:has(a[data-testid="adCardDetailPageTitle"])',
-    );
+    const cards = $('article:has(a[data-testid="adCardDetailPageTitle"])');
     if (cards.length > 0) {
       cards.each((_, el) => {
         const $el = $(el);
@@ -195,9 +192,7 @@ export class HtmlParserService {
    * Current markup uses data-testid anchors instead of stable classes.
    */
   private isNewMarkup(listing: CheerioElement): boolean {
-    return (
-      listing.find('a[data-testid="adCardDetailPageTitle"]').length > 0
-    );
+    return listing.find('a[data-testid="adCardDetailPageTitle"]').length > 0;
   }
 
   /**
@@ -241,13 +236,11 @@ export class HtmlParserService {
     // "2012. Karavan") — most reliable source for year and mileage.
     // domhandler Elements expose attributes directly, no cheerio needed.
     const descTitles: string[] = [];
-    listing
-      .find('[data-testid="adDescription"] div[title]')
-      .each((_, el) => {
-        const title = (el as unknown as { attribs?: { title?: string } })
-          .attribs?.title;
-        if (title) descTitles.push(title);
-      });
+    listing.find('[data-testid="adDescription"] div[title]').each((_, el) => {
+      const title = (el as unknown as { attribs?: { title?: string } }).attribs
+        ?.title;
+      if (title) descTitles.push(title);
+    });
 
     if (!data.year) {
       for (const item of descTitles) {
@@ -311,8 +304,7 @@ export class HtmlParserService {
       ];
       for (const fuel of fuelTypes) {
         if (text.toLowerCase().includes(fuel)) {
-          data.fuelType =
-            fuel.charAt(0).toUpperCase() + fuel.slice(1);
+          data.fuelType = fuel.charAt(0).toUpperCase() + fuel.slice(1);
           break;
         }
       }
@@ -382,9 +374,7 @@ export class HtmlParserService {
       const href = titleElem.attr('href') || '';
       // Extract base URL (e.g., "https://www.polovniautomobili.com") from config
       const baseUrl = this.baseUrl.replace(/\/auto-oglasi\/pretraga.*/, '');
-      const url = href.startsWith('/')
-        ? `${baseUrl}${href}`
-        : href;
+      const url = href.startsWith('/') ? `${baseUrl}${href}` : href;
       return { title, url };
     }
 
@@ -426,7 +416,10 @@ export class HtmlParserService {
     }
 
     // Extract price number (100-999999)
-    return { price: this.extractPriceNumber(priceText), note: this.extractLegacyNote(priceText) };
+    return {
+      price: this.extractPriceNumber(priceText),
+      note: this.extractLegacyNote(priceText),
+    };
   }
 
   /**

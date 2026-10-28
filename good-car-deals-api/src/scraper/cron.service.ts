@@ -20,7 +20,9 @@ export class CronService {
    */
   @Cron(CronExpression.EVERY_WEEK)
   async handleWeeklyScrape(): Promise<void> {
-    const cronSchedule = this.configService.get<string>('scraper.cronSchedule')!;
+    const cronSchedule = this.configService.get<string>(
+      'scraper.cronSchedule',
+    )!;
     const model = this.configService.get<string>('scraper.model')!;
 
     this.logger.log(`Cron job triggered (schedule: ${cronSchedule})`);

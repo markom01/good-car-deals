@@ -1,4 +1,10 @@
-import { Controller, DefaultValuePipe, Get, ParseEnumPipe, Query } from '@nestjs/common';
+import {
+  Controller,
+  DefaultValuePipe,
+  Get,
+  ParseEnumPipe,
+  Query,
+} from '@nestjs/common';
 import { DealsService } from './deals.service';
 import { Listing } from '@good-car-deals/shared';
 
@@ -13,7 +19,11 @@ export class DealsController {
 
   @Get()
   async getDeals(
-    @Query('sort', new DefaultValuePipe(DealSort.SCORE), new ParseEnumPipe(DealSort))
+    @Query(
+      'sort',
+      new DefaultValuePipe(DealSort.SCORE),
+      new ParseEnumPipe(DealSort),
+    )
     sort: DealSort,
   ): Promise<Listing[]> {
     return this.dealsService.getDeals(sort);

@@ -29,7 +29,9 @@ describe('Full Flow E2E - Fresh Scrape → Save → Classify → Verify', () => 
     await app.init();
 
     scraperService = moduleFixture.get<ScraperService>(ScraperService);
-    dealClassifierService = moduleFixture.get<DealClassifierService>(DealClassifierService);
+    dealClassifierService = moduleFixture.get<DealClassifierService>(
+      DealClassifierService,
+    );
   }, 120000);
 
   afterAll(async () => {
@@ -66,12 +68,16 @@ describe('Full Flow E2E - Fresh Scrape → Save → Classify → Verify', () => 
     // Log sample
     console.log('\n  Sample deals:');
     for (const deal of deals.slice(0, 5)) {
-      console.log(`    - ${deal.title} | ${deal.price} | ${deal.year}y | ${deal.dealType}`);
+      console.log(
+        `    - ${deal.title} | ${deal.price} | ${deal.year}y | ${deal.dealType}`,
+      );
     }
 
     // Verify
     expect(deals.length).toBeGreaterThan(0);
-    const classifiedCount = deals.filter((d: any) => d.dealType !== null).length;
+    const classifiedCount = deals.filter(
+      (d: any) => d.dealType !== null,
+    ).length;
     console.log(`\n  Classified: ${classifiedCount}/${deals.length}`);
 
     expect(classifiedCount).toBeGreaterThan(0);

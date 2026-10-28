@@ -11,7 +11,11 @@ export class AppController {
   }
 
   @Get('health')
-  healthCheck(): Promise<{ status: string; database: string; timestamp: string }> {
+  healthCheck(): Promise<{
+    status: string;
+    database: string;
+    timestamp: string;
+  }> {
     return this.appService.healthCheck();
   }
 }
