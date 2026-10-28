@@ -1,17 +1,18 @@
-"use client"
+'use client';
 
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
-} from "@/components/ui/carousel"
-import { DealCard } from "@/components/deal-card"
-import { MOCK_DEALS } from "./mock-deals"
-import Autoplay from "embla-carousel-autoplay"
+} from '@/components/ui/carousel';
+import Image from 'next/image';
+import { DealCard } from '@/components/deal-card';
+import { MOCK_DEALS } from './mock-deals';
+import Autoplay from 'embla-carousel-autoplay';
 
 export default function WheelRankPage() {
   return (
@@ -20,10 +21,13 @@ export default function WheelRankPage() {
         {/* 1. HERO SECTION — Full viewport, centered */}
         <div className="min-h-dvh flex flex-col justify-center gap-6 md:gap-12 pt-2 pb-4 md:pt-6 md:pb-12">
           <div className="flex flex-col items-center text-center">
-            <img
+            <Image
               src="/wheelrank-logo.svg"
               alt="WheelRank"
+              width={64}
+              height={64}
               className="mb-4 md:mb-6 size-16"
+              unoptimized
             />
             <Badge variant="secondary" className="mb-4">
               Raising Starts 2026
@@ -35,8 +39,9 @@ export default function WheelRankPage() {
               Used vehicle deals, ranked.
             </p>
             <p className="mb-6 md:mb-8 max-w-prose text-base text-muted-foreground">
-              WheelRank analyzes used vehicle listings and assigns every deal a Deal Score —
-              an objective 0-100 rating based on market data. Stop guessing. Start ranking.
+              WheelRank analyzes used vehicle listings and assigns every deal a
+              Deal Score — an objective 0-100 rating based on market data. Stop
+              guessing. Start ranking.
             </p>
             <Button variant="default" size="lg" asChild>
               <a href="#market-stats">Learn More</a>
@@ -44,28 +49,28 @@ export default function WheelRankPage() {
           </div>
 
           <div className="overflow-hidden -mx-2">
-          <Carousel
-            className="mx-2 [&_[data-slot='carousel-content']]:!overflow-visible"
-            opts={{ loop: true, align: "start" }}
-            plugins={[
-              Autoplay({
-                delay: 4000,
-                stopOnInteraction: false,
-                stopOnMouseEnter: false,
-              }),
-            ]}
-          >
-            <CarouselContent>
-              {MOCK_DEALS.map((deal) => (
-                <CarouselItem
-                  key={deal.id}
-                  className="basis-full md:basis-1/2 lg:basis-1/3 py-2 max-sm:px-4 flex justify-center"
-                >
-                  <DealCard deal={deal} />
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-          </Carousel>
+            <Carousel
+              className="mx-2 [&_[data-slot='carousel-content']]:!overflow-visible"
+              opts={{ loop: true, align: 'start' }}
+              plugins={[
+                Autoplay({
+                  delay: 4000,
+                  stopOnInteraction: false,
+                  stopOnMouseEnter: false,
+                }),
+              ]}
+            >
+              <CarouselContent>
+                {MOCK_DEALS.map((deal) => (
+                  <CarouselItem
+                    key={deal.id}
+                    className="basis-full md:basis-1/2 lg:basis-1/3 py-2 max-sm:px-4 flex justify-center"
+                  >
+                    <DealCard deal={deal} />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+            </Carousel>
           </div>
         </div>
 
@@ -137,9 +142,10 @@ export default function WheelRankPage() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Serbia&apos;s largest classifieds site lists ~75,000–80,000 used vehicles,
-                  yet no tool provides an objective assessment. Buyers navigate subjective ads,
-                  hidden defects, and no standardized way to compare deals.
+                  Serbia&apos;s largest classifieds site lists ~75,000–80,000
+                  used vehicles, yet no tool provides an objective assessment.
+                  Buyers navigate subjective ads, hidden defects, and no
+                  standardized way to compare deals.
                 </p>
               </CardContent>
             </Card>
@@ -155,29 +161,35 @@ export default function WheelRankPage() {
               </CardHeader>
               <CardContent>
                 <p className="mb-4 text-muted-foreground">
-                  WheelRank assigns every listing a Deal Score (0–100) using two methods:
-                  price-per-year ranking and model average comparison.
+                  WheelRank assigns every listing a Deal Score (0–100) using two
+                  methods: price-per-year ranking and model average comparison.
                 </p>
                 <ul className="flex flex-col gap-3 text-sm">
                   <li className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-primary" />
                     <span>
-                      <strong className="text-foreground">GOOD DEAL</strong>{" "}
-                      <span className="text-muted-foreground">(top 20%) — Score 80–100</span>
+                      <strong className="text-foreground">GOOD DEAL</strong>{' '}
+                      <span className="text-muted-foreground">
+                        (top 20%) — Score 80–100
+                      </span>
                     </span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-primary/60" />
                     <span>
-                      <strong className="text-foreground">DECENT DEAL</strong>{" "}
-                      <span className="text-muted-foreground">(20–50%) — Score 50–79</span>
+                      <strong className="text-foreground">DECENT DEAL</strong>{' '}
+                      <span className="text-muted-foreground">
+                        (20–50%) — Score 50–79
+                      </span>
                     </span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="size-2 rounded-full bg-destructive" />
                     <span>
-                      <strong className="text-foreground">OVERPRICED</strong>{" "}
-                      <span className="text-muted-foreground">(bottom 50%) — Score 0–49</span>
+                      <strong className="text-foreground">OVERPRICED</strong>{' '}
+                      <span className="text-muted-foreground">
+                        (bottom 50%) — Score 0–49
+                      </span>
                     </span>
                   </li>
                 </ul>
@@ -240,14 +252,13 @@ export default function WheelRankPage() {
                 Part of Raising Starts 2026
               </h3>
               <p className="max-w-md text-muted-foreground">
-                WheelRank is participating in the Raising Starts accelerator program
-                by NTP Belgrade, supported by the Swiss Government.
+                WheelRank is participating in the Raising Starts accelerator
+                program by NTP Belgrade, supported by the Swiss Government.
               </p>
             </CardContent>
           </Card>
         </section>
-
       </main>
     </div>
-  )
+  );
 }
