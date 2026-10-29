@@ -31,6 +31,26 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   CORS_ORIGIN?: string;
+
+  /** VAPID public key for web push (optional — push disabled if unset). */
+  @IsOptional()
+  @IsString()
+  VAPID_PUBLIC_KEY?: string;
+
+  /** VAPID private key for web push (optional — push disabled if unset). */
+  @IsOptional()
+  @IsString()
+  VAPID_PRIVATE_KEY?: string;
+
+  /** mailto: address for VAPID identification (optional — push disabled if unset). */
+  @IsOptional()
+  @IsString()
+  VAPID_EMAIL?: string;
+
+  /** Enable push delivery (optional — defaults false). */
+  @IsOptional()
+  @IsString()
+  PUSH_ENABLED?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

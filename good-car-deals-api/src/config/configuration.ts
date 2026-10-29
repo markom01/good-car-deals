@@ -7,6 +7,17 @@ export interface AppConfig {
     model: string;
     proxyUrl?: string;
   };
+  willhaben: {
+    enabled: boolean;
+    pollIntervalMs: number;
+    filter: string;
+  };
+  push: {
+    vapidPublicKey?: string;
+    vapidPrivateKey?: string;
+    vapidEmail?: string;
+    enabled: boolean;
+  };
 }
 
 export default (): AppConfig => ({
@@ -17,5 +28,16 @@ export default (): AppConfig => ({
     brand: process.env.SCRAPER_BRAND!,
     model: process.env.SCRAPER_MODEL!,
     proxyUrl: process.env.SCRAPER_PROXY_URL,
+  },
+  willhaben: {
+    enabled: process.env.WILLHABEN_ENABLED === 'true',
+    pollIntervalMs: Number(process.env.WILLHABEN_POLL_INTERVAL_MS ?? 5000),
+    filter: process.env.WILLHABEN_FILTER ?? '',
+  },
+  push: {
+    vapidPublicKey: process.env.VAPID_PUBLIC_KEY,
+    vapidPrivateKey: process.env.VAPID_PRIVATE_KEY,
+    vapidEmail: process.env.VAPID_EMAIL,
+    enabled: process.env.PUSH_ENABLED === 'true',
   },
 });

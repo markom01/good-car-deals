@@ -10,6 +10,8 @@ import { ScraperModule } from './scraper/scraper.module';
 import { AnalysisModule } from './analysis/analysis.module';
 import { DealsModule } from './deals/deals.module';
 import { CronService } from './scraper/cron.service';
+import { WillhabenWatcherModule } from './willhaben-watcher/willhaben-watcher.module';
+import { PushModule } from './push/push.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -26,6 +28,8 @@ import { AppService } from './app.service';
     ScraperModule,
     AnalysisModule,
     DealsModule,
+    WillhabenWatcherModule,
+    PushModule,
   ],
   controllers: [AppController],
   providers: [
