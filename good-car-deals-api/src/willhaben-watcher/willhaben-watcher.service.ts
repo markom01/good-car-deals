@@ -51,7 +51,7 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
     private readonly pushService: PushService,
   ) {
     this.config = {
-      enabled: this.configService.get<boolean>('WILLHABEN_ENABLED') === true,
+      enabled: this.configService.get<string>('WILLHABEN_ENABLED') === 'true',
       pollIntervalMs: Number(
         this.configService.get<number>('WILLHABEN_POLL_INTERVAL_MS') ?? 5000,
       ),
