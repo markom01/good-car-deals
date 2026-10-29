@@ -46,16 +46,22 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
   private readonly seen = new Set<string>();
   private timer: ReturnType<typeof setInterval> | null = null;
 
+  private readonly priceTo?: number;
+
   constructor(
     private readonly configService: ConfigService,
     private readonly pushService: PushService,
   ) {
+    const filter = this.configService.get<string>('WILLHABEN_FILTER') ?? '';
+    const priceToMatch = filter.match(/price[_:]?to[=:](\d+)/i);
+    this.priceTo = priceToMatch ? Number(priceToMatch[1]) : undefined;
+
     this.config = {
       enabled: this.configService.get<string>('WILLHABEN_ENABLED') === 'true',
       pollIntervalMs: Number(
         this.configService.get<number>('WILLHABEN_POLL_INTERVAL_MS') ?? 5000,
       ),
-      filter: this.configService.get<string>('WILLHABEN_FILTER') ?? '',
+      filter,
     };
     this.seenFile = join(process.cwd(), 'data', 'willhaben-seen.json');
     this.loadSeen();
@@ -101,12 +107,22 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
       if (this.seen.has(id)) continue;
 
       const published = this.attr(ad, 'PUBLISHED');
-      const price = this.attr(ad, 'PRICE/AMOUNT');
+      const priceStr = this.attr(ad, 'PRICE/AMOUNT');
+      const price = priceStr ? Number(priceStr) : null;
       const seo = this.attr(ad, 'SEO_URL');
       const link = seo ? 'https://www.willhaben.at/iad/' + seo : null;
 
+      // Client-side price filter (willhaben API doesn't support price filtering)
+      if (
+        this.priceTo !== undefined &&
+        price !== null &&
+        price > this.priceTo
+      ) {
+        continue;
+      }
+
       this.logger.log(
-        `[WILLHABEN] NEW ${id} ${ad.description} €${price ?? '-'} ` +
+        `[WILLHABEN] NEW ${id} ${ad.description} €${priceStr ?? '-'} ` +
           `${published ? new Date(Number(published)).toISOString() : '-'} ` +
           `${link ?? ''}`,
       );
@@ -114,7 +130,7 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
       await this.pushService.notifyNewAd({
         id,
         title: ad.description,
-        price,
+        price: priceStr,
         published,
         link,
       });
