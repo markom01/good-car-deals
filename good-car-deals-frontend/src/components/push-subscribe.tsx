@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'https://good-car-deals-api.onrender.com';
@@ -19,41 +19,79 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export function PushSubscribe() {
-  useEffect(() => {
+  const [status, setStatus] = useState<
+    'idle' | 'subscribing' | 'subscribed' | 'error'
+  >('idle');
+
+  const subscribe = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      setStatus('error');
       return;
     }
 
-    (async () => {
-      try {
-        await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-        const registration = await navigator.serviceWorker.ready;
-        const existing = await registration.pushManager.getSubscription();
-        if (existing) {
-          return;
-        }
+    try {
+      setStatus('subscribing');
 
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as any,
-        });
+      // Register service worker
+      await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      const registration = await navigator.serviceWorker.ready;
 
-        const res = await fetch(`${API_URL}/push/subscribe`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(subscription),
-        });
-
-        if (!res.ok) {
-          throw new Error(`subscribe failed: ${res.status}`);
-        }
-      } catch (err) {
-        console.error('Push subscription failed:', err);
+      // Check if already subscribed
+      const existing = await registration.pushManager.getSubscription();
+      if (existing) {
+        setStatus('subscribed');
+        return;
       }
-    })();
 
-    return () => {};
-  }, []);
+      // Subscribe to push — MUST be called in response to a user gesture on iOS Safari
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
 
-  return null;
+      // Send subscription to our API
+      const res = await fetch(`${API_URL}/push/subscribe`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(subscription),
+      });
+
+      if (!res.ok) {
+        throw new Error(`subscribe failed: ${res.status}`);
+      }
+
+      setStatus('subscribed');
+    } catch (err) {
+      console.error('Push subscription failed:', err);
+      setStatus('error');
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 24,
+        right: 24,
+        zIndex: 1000,
+        background: '#14b8a6',
+        color: '#ffffff',
+        padding: '12px 20px',
+        borderRadius: 32,
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: 14,
+        fontWeight: 600,
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        cursor: status === 'subscribing' ? 'not-allowed' : 'pointer',
+        opacity: status === 'subscribed' ? 0.6 : 1,
+      }}
+      onClick={subscribe}
+    >
+      {status === 'subscribing'
+        ? 'Activating notifications...'
+        : status === 'subscribed'
+          ? 'Notifications active ✓'
+          : 'Get notified of new deals'}
+    </div>
+  );
 }

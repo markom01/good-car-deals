@@ -1,6 +1,7 @@
 {
   "name": "Good Car Deals",
   "short_name": "GoodCarDeals",
+  "id": "/",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
