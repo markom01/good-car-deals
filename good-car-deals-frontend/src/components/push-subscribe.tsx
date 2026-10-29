@@ -46,7 +46,9 @@ export function PushSubscribe() {
       // Subscribe to push — MUST be called in response to a user gesture on iOS Safari
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+        applicationServerKey: urlBase64ToUint8Array(
+          VAPID_PUBLIC_KEY,
+        ) as unknown as BufferSource,
       });
 
       // Send subscription to our API
