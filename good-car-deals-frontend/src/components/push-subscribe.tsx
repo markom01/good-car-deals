@@ -33,18 +33,15 @@ export function PushSubscribe() {
     try {
       setStatus('subscribing');
 
-      // Register service worker
       await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       const registration = await navigator.serviceWorker.ready;
 
-      // Check if already subscribed
       const existing = await registration.pushManager.getSubscription();
       if (existing) {
         setStatus('subscribed');
         return;
       }
 
-      // Subscribe to push — MUST be called in response to a user gesture on iOS Safari
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(
@@ -52,7 +49,6 @@ export function PushSubscribe() {
         ) as unknown as BufferSource,
       });
 
-      // Send subscription to our API
       const res = await fetch(`${API_URL}/push/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
