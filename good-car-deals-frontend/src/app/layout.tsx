@@ -36,6 +36,19 @@ export const metadata: Metadata = {
     description:
       'Find underpriced used cars — classified listings scored against a market price model, updated weekly.',
   },
+  other: {
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-title': 'Good Car Deals',
+    'apple-mobile-web-app-status-bar-style': 'default',
+  },
+  icons: {
+    icon: [
+      { url: '/wheelrank-logo.svg', sizes: '512x512', type: 'image/svg+xml' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -48,6 +61,15 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased scroll-smooth`}
     >
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <link
+          rel="apple-touch-icon"
+          href="/apple-touch-icon.png"
+          sizes="180x180"
+          type="image/png"
+        />
+      </head>
       <body className="min-h-screen flex flex-col">
         <Providers>{children}</Providers>
         <PushSubscribe />
