@@ -107,16 +107,25 @@ export class PushService {
           privateKey: this.vapid!.privateKey,
         },
       });
-    } catch (error) {
-      const err = error as { statusCode?: number; message?: string };
-      if (err.statusCode === 410 || err.statusCode === 404) {
+    } catch (error: any) {
+      const err = error as {
+        statusCode?: number;
+        message?: string;
+        body?: string;
+        headers?: Record<string, string>;
+      };
+      const statusCode = err.statusCode;
+      const body = err.body ?? error?.body ?? 'no body';
+      const headers = err.headers ?? error?.headers ?? {};
+      this.logger.error(
+        `Push send failed: statusCode=${statusCode} message=${err.message ?? String(error)} body=${body} headers=${JSON.stringify(headers)}`,
+      );
+      if (statusCode === 410 || statusCode === 404 || statusCode === 401) {
         this.subscriptions = this.subscriptions.filter(
           (s) => s.endpoint !== sub.endpoint,
         );
         this.saveSubs();
         this.logger.log(`Removed expired push subscription ${sub.endpoint}`);
-      } else {
-        this.logger.error(`Push send failed: ${err.message ?? String(error)}`);
       }
     }
   }
