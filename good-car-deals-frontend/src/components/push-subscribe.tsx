@@ -2,7 +2,8 @@
 
 import { useEffect } from 'react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? 'https://good-car-deals-api.onrender.com';
 const VAPID_PUBLIC_KEY =
   'BD5OuOzLU9inVkJlOLWC4uP6SiNXTEbO7XDKa2Gnj1B4gN5a-igOa6Tu32zgGpOIT9r80Hsuabr9Ko0Ba3EMbyE';
 
@@ -25,7 +26,6 @@ export function PushSubscribe() {
 
     (async () => {
       try {
-        // Register service worker first
         await navigator.serviceWorker.register('/sw.js', { scope: '/' });
         const registration = await navigator.serviceWorker.ready;
         const existing = await registration.pushManager.getSubscription();
@@ -35,7 +35,7 @@ export function PushSubscribe() {
 
         const subscription = await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as any,
         });
 
         const res = await fetch(`${API_URL}/push/subscribe`, {
