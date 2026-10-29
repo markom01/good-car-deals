@@ -43,6 +43,9 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
   private readonly config: WatcherConfig;
   private readonly seen = new Set<string>();
   private timer: ReturnType<typeof setInterval> | null = null;
+  private flushTimer: ReturnType<typeof setInterval> | null = null;
+  private pendingSeen: string[] = [];
+  private readonly seenFlushMs = 30 * 60 * 1000;
 
   private readonly priceTo?: number;
 
@@ -75,8 +78,8 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  onModuleDestroy(): void {
-    this.stop();
+  async onModuleDestroy(): Promise<void> {
+    await this.stop();
   }
 
   /** Manually trigger one poll. Used by the /poll endpoint. */
@@ -138,7 +141,10 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (added.length > 0) {
-      await this.saveSeen(added);
+      this.pendingSeen.push(...added);
+      if (this.pendingSeen.length >= 500) {
+        await this.flushSeen();
+      }
     }
 
     return { found: ads.length, newAds: added.length };
@@ -155,16 +161,25 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
       () => void this.poll(),
       this.config.pollIntervalMs,
     );
+    this.flushTimer = setInterval(
+      () => void this.flushSeen(),
+      this.seenFlushMs,
+    );
     this.logger.log(
       `Willhaben watcher polling every ${this.config.pollIntervalMs}ms`,
     );
   }
 
-  private stop(): void {
+  private async stop(): Promise<void> {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
     }
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = null;
+    }
+    await this.flushSeen();
   }
 
   private async loadSeen(): Promise<void> {
@@ -181,13 +196,18 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async saveSeen(ids: string[]): Promise<void> {
+  private async flushSeen(): Promise<void> {
+    if (this.pendingSeen.length === 0) return;
+    const ids = this.pendingSeen;
+    this.pendingSeen = [];
     try {
       await this.prisma.seenWillhabenAd.createMany({
         data: ids.map((id) => ({ id })),
         skipDuplicates: true,
       });
+      this.logger.log(`Flushed ${ids.length} seen willhaben ad IDs to DB`);
     } catch (error) {
+      this.pendingSeen.unshift(...ids);
       this.logger.error(`Failed to persist seen IDs: ${String(error)}`);
     }
   }
