@@ -9,9 +9,9 @@ services:
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: '22'
       - key: PORT
-        value: "10000"
+        value: '10000'
       - key: DATABASE_URL
         sync: false
       - key: SCRAPER_TARGET_URL
@@ -21,6 +21,18 @@ services:
       - key: SCRAPER_MODEL
         sync: false
       - key: SCRAPER_CRON_SCHEDULE
-        value: "0 0 * * 0"
+        value: '0 0 * * 0'
       - key: SKIP_STARTUP_SCRAPE
-        value: "true"
+        value: 'true'
+      - key: WILLHABEN_ENABLED
+        value: 'true'
+      - key: WILLHABEN_POLL_INTERVAL_MS
+        value: '5000'
+      - key: VAPID_PUBLIC_KEY
+        value: 'BD5OuOzLU9inVkJlOLWC4uP6SiNXTEbO7XDKa2Gnj1B4gN5a-igOa6Tu32zgGpOIT9r80Hsuabr9Ko0Ba3EMbyE'
+      - key: VAPID_PRIVATE_KEY
+        value: '1B1tv6sFPd_C-BHlr_Ma2s7LRYyJgvyZcaWzuGsQAOY'
+      - key: VAPID_EMAIL
+        value: 'mailto:admin@good-car-deals.local'
+      - key: PUSH_ENABLED
+        value: 'true'
