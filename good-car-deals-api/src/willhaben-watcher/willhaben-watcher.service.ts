@@ -53,7 +53,7 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
     private readonly pushService: PushService,
   ) {
     const filter = this.configService.get<string>('WILLHABEN_FILTER') ?? '';
-    const priceToMatch = filter.match(/price[_:]?to[=:](\d+)/i);
+    const priceToMatch = filter.match(/price[_:\-]?to[=:](\d+)/i);
     this.priceTo = priceToMatch ? Number(priceToMatch[1]) : undefined;
 
     this.config = {
