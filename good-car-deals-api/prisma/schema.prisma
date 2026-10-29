@@ -36,3 +36,20 @@ model Listing {
   @@index([scrapedAt])
   @@map("listings")
 }
+
+model PushSubscription {
+  endpoint  String   @id
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("push_subscriptions")
+}
+
+model SeenWillhabenAd {
+  id     String   @id
+  seenAt DateTime @default(now()) @map("seen_at")
+
+  @@index([seenAt])
+  @@map("seen_willhaben_ads")
+}

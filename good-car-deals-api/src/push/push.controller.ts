@@ -31,11 +31,11 @@ export class PushController {
   constructor(private readonly service: PushService) {}
 
   @Post('subscribe')
-  subscribe(@Body() subscription: PushSubscriptionBody) {
+  async subscribe(@Body() subscription: PushSubscriptionBody) {
     if (!isPushSubscription(subscription)) {
       throw new BadRequestException('Invalid push subscription');
     }
-    this.service.subscribe(subscription);
+    await this.service.subscribe(subscription);
     return { ok: true };
   }
 

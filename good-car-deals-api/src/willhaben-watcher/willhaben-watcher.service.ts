@@ -6,8 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PushService } from '../push/push.service';
-import { join } from 'path';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { PrismaService } from '../prisma/prisma.service';
 
 const WILLHABEN_API =
   'https://ad-search.willhaben.at/restapi/v2/search/atz/seo/gebrauchtwagen/auto';
@@ -42,7 +41,6 @@ interface WatcherConfig {
 export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WillhabenWatcherService.name);
   private readonly config: WatcherConfig;
-  private readonly seenFile: string;
   private readonly seen = new Set<string>();
   private timer: ReturnType<typeof setInterval> | null = null;
 
@@ -51,9 +49,10 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly configService: ConfigService,
     private readonly pushService: PushService,
+    private readonly prisma: PrismaService,
   ) {
     const filter = this.configService.get<string>('WILLHABEN_FILTER') ?? '';
-    const priceToMatch = filter.match(/price[_:\-]?to[=:](\d+)/i);
+    const priceToMatch = filter.match(/price[:_-]?to[=:](\d+)/i);
     this.priceTo = priceToMatch ? Number(priceToMatch[1]) : undefined;
 
     this.config = {
@@ -63,11 +62,10 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
       ),
       filter,
     };
-    this.seenFile = join(process.cwd(), 'data', 'willhaben-seen.json');
-    this.loadSeen();
   }
 
-  onModuleInit(): void {
+  async onModuleInit(): Promise<void> {
+    await this.loadSeen();
     if (this.config.enabled) {
       this.start();
     } else {
@@ -101,7 +99,7 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
     const body = (await response.json()) as WillhabenSearchResponse;
     const ads: WillhabenAdvert[] = body.advertSummaryList?.advertSummary ?? [];
 
-    let newAds = 0;
+    const added: string[] = [];
     for (const ad of ads) {
       const id = String(ad.id);
       if (this.seen.has(id)) continue;
@@ -136,14 +134,14 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
       });
 
       this.seen.add(id);
-      newAds++;
+      added.push(id);
     }
 
-    if (newAds > 0) {
-      this.saveSeen();
+    if (added.length > 0) {
+      await this.saveSeen(added);
     }
 
-    return { found: ads.length, newAds };
+    return { found: ads.length, newAds: added.length };
   }
 
   private attr(ad: WillhabenAdvert, name: string): string | null {
@@ -169,27 +167,26 @@ export class WillhabenWatcherService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private loadSeen(): void {
+  private async loadSeen(): Promise<void> {
     try {
-      if (existsSync(this.seenFile)) {
-        const data: unknown = JSON.parse(readFileSync(this.seenFile, 'utf-8'));
-        if (Array.isArray(data)) {
-          for (const id of data) this.seen.add(String(id));
-          this.logger.log(`Loaded ${this.seen.size} seen willhaben ad IDs`);
-        }
-      }
-    } catch {
-      // corrupt file -> start fresh
+      const rows = await this.prisma.seenWillhabenAd.findMany({
+        select: { id: true },
+      });
+      for (const row of rows) this.seen.add(row.id);
+      this.logger.log(`Loaded ${this.seen.size} seen willhaben ad IDs from DB`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to load seen willhaben ad IDs: ${String(error)}`,
+      );
     }
   }
 
-  private saveSeen(): void {
+  private async saveSeen(ids: string[]): Promise<void> {
     try {
-      const dir = this.seenFile.slice(0, this.seenFile.lastIndexOf('/'));
-      if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-      }
-      writeFileSync(this.seenFile, JSON.stringify([...this.seen]));
+      await this.prisma.seenWillhabenAd.createMany({
+        data: ids.map((id) => ({ id })),
+        skipDuplicates: true,
+      });
     } catch (error) {
       this.logger.error(`Failed to persist seen IDs: ${String(error)}`);
     }

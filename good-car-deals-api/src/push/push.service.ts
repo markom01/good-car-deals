@@ -1,8 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as webpush from 'web-push';
-import { join } from 'path';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { PrismaService } from '../prisma/prisma.service';
 
 interface PushSubscription {
   endpoint: string;
@@ -21,17 +20,20 @@ interface NewAdPayload {
 }
 
 @Injectable()
-export class PushService {
+export class PushService implements OnModuleInit {
   private readonly logger = new Logger(PushService.name);
-  private readonly subsFile: string;
   private subscriptions: PushSubscription[] = [];
+  private loaded = false;
   private readonly vapid: {
     publicKey: string;
     privateKey: string;
     email: string;
   } | null = null;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
+  ) {
     const publicKey = this.configService.get<string>('VAPID_PUBLIC_KEY');
     const privateKey = this.configService.get<string>('VAPID_PRIVATE_KEY');
     const email = this.configService.get<string>('VAPID_EMAIL');
@@ -45,9 +47,10 @@ export class PushService {
         'Push service disabled: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_EMAIL not all set',
       );
     }
+  }
 
-    this.subsFile = join(process.cwd(), 'data', 'push-subscriptions.json');
-    this.loadSubs();
+  async onModuleInit(): Promise<void> {
+    await this.loadSubs();
   }
 
   subscriptionCount(): number {
@@ -58,17 +61,28 @@ export class PushService {
     return this.vapid !== null;
   }
 
-  subscribe(subscription: PushSubscription): void {
+  async subscribe(subscription: PushSubscription): Promise<void> {
     const exists = this.subscriptions.some(
       (s) => s.endpoint === subscription.endpoint,
     );
-    if (!exists) {
-      this.subscriptions.push(subscription);
-      this.saveSubs();
-      this.logger.log(
-        `Push subscription stored (${this.subscriptions.length} total)`,
-      );
-    }
+    if (exists) return;
+
+    this.subscriptions.push(subscription);
+    await this.prisma.pushSubscription.upsert({
+      where: { endpoint: subscription.endpoint },
+      update: {
+        p256dh: subscription.keys.p256dh,
+        auth: subscription.keys.auth,
+      },
+      create: {
+        endpoint: subscription.endpoint,
+        p256dh: subscription.keys.p256dh,
+        auth: subscription.keys.auth,
+      },
+    });
+    this.logger.log(
+      `Push subscription stored (${this.subscriptions.length} total)`,
+    );
   }
 
   async notifyNewAd(ad: {
@@ -78,6 +92,7 @@ export class PushService {
     published: string | null;
     link: string | null;
   }): Promise<void> {
+    if (!this.loaded) await this.loadSubs();
     if (!this.vapid || this.subscriptions.length === 0) return;
 
     const payload: NewAdPayload = {
@@ -107,7 +122,7 @@ export class PushService {
           privateKey: this.vapid!.privateKey,
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const err = error as {
         statusCode?: number;
         message?: string;
@@ -115,8 +130,8 @@ export class PushService {
         headers?: Record<string, string>;
       };
       const statusCode = err.statusCode;
-      const body = err.body ?? error?.body ?? 'no body';
-      const headers = err.headers ?? error?.headers ?? {};
+      const body = err.body ?? 'no body';
+      const headers = err.headers ?? {};
       this.logger.error(
         `Push send failed: statusCode=${statusCode} message=${err.message ?? String(error)} body=${body} headers=${JSON.stringify(headers)}`,
       );
@@ -124,43 +139,27 @@ export class PushService {
         this.subscriptions = this.subscriptions.filter(
           (s) => s.endpoint !== sub.endpoint,
         );
-        this.saveSubs();
+        await this.prisma.pushSubscription.deleteMany({
+          where: { endpoint: sub.endpoint },
+        });
         this.logger.log(`Removed expired push subscription ${sub.endpoint}`);
       }
     }
   }
 
-  private loadSubs(): void {
+  private async loadSubs(): Promise<void> {
     try {
-      if (existsSync(this.subsFile)) {
-        const data: unknown = JSON.parse(readFileSync(this.subsFile, 'utf-8'));
-        if (Array.isArray(data)) {
-          for (const s of data) {
-            if (s && typeof s === 'object' && 'endpoint' in s && 'keys' in s) {
-              this.subscriptions.push(s as PushSubscription);
-            }
-          }
-          this.logger.log(
-            `Loaded ${this.subscriptions.length} push subscriptions`,
-          );
-        }
-      }
-    } catch {
-      // corrupt file -> start fresh
-    }
-  }
-
-  private saveSubs(): void {
-    try {
-      const dir = this.subsFile.slice(0, this.subsFile.lastIndexOf('/'));
-      if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-      }
-      writeFileSync(this.subsFile, JSON.stringify(this.subscriptions));
-    } catch (error) {
-      this.logger.error(
-        `Failed to persist push subscriptions: ${String(error)}`,
+      const rows = await this.prisma.pushSubscription.findMany();
+      this.subscriptions = rows.map((s) => ({
+        endpoint: s.endpoint,
+        keys: { p256dh: s.p256dh, auth: s.auth },
+      }));
+      this.loaded = true;
+      this.logger.log(
+        `Loaded ${this.subscriptions.length} push subscriptions from DB`,
       );
+    } catch (error) {
+      this.logger.error(`Failed to load push subscriptions: ${String(error)}`);
     }
   }
 }
