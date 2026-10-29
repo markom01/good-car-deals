@@ -2,6 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Impit, HTTPStatusError, TimeoutError } from 'impit';
 
+/** Non-2xx response, carrying the status so callers can react to 404s. */
+export class HttpError extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP error: ${status}`);
+    this.name = 'HttpError';
+  }
+}
+
 @Injectable()
 export class HttpService {
   private readonly baseUrl: string;
@@ -45,18 +53,32 @@ export class HttpService {
    * @returns The HTML content as a string
    */
   async fetchPage(url: string): Promise<string> {
+    return this.request(url, this.headers.Accept);
+  }
+
+  /**
+   * Fetch a JSON endpoint with the same retry/proxy behaviour as fetchPage.
+   * @param url - JSON endpoint
+   * @returns Parsed response body
+   */
+  async fetchJson<T>(url: string): Promise<T> {
+    const body = await this.request(url, 'application/json, text/plain, */*');
+    return JSON.parse(body) as T;
+  }
+
+  private async request(url: string, accept: string): Promise<string> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         const response = await this.impit.fetch(url, {
-          headers: this.headers,
+          headers: { ...this.headers, Accept: accept },
           timeout: this.timeout,
         });
 
         // Check for HTTP errors
         if (!response.ok) {
-          throw new Error(`HTTP error: ${response.status}`);
+          throw new HttpError(response.status);
         }
 
         return await response.text();

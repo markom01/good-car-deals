@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { HttpService } from './http.service';
+import { ApiClientService } from './api-client.service';
 import { HtmlParserService, RawListingData } from './html-parser.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { parseEngineCc, parsePowerKw } from '../utils/normalization';
@@ -12,7 +12,7 @@ export class ScraperService {
   private readonly maxPages = 15;
 
   constructor(
-    private httpService: HttpService,
+    private apiClientService: ApiClientService,
     private htmlParserService: HtmlParserService,
     private prismaService: PrismaService,
     private configService: ConfigService,
@@ -20,61 +20,38 @@ export class ScraperService {
 
   /**
    * Scrape all target model listings (up to maxPages).
-   * Page 1 is fetched from the configured URL, follow-up pages are
-   * discovered from the site's own pagination links (robust against
-   * slug changes), falling back to built URLs when none are found.
+   * Pages come from the site's JSON search feed; pagination stops at the
+   * last page the API reports.
    * @returns Array of raw listing data (deduplicated by listingUrl)
    */
   async scrapeTargetModel(): Promise<RawListingData[]> {
     const allListings: RawListingData[] = [];
-    const visited = new Set<string>();
-    const queue: string[] = [this.httpService.buildSearchUrl(1)];
+    let pageCount = 1;
     let successCount = 0;
     let failCount = 0;
     const model = this.configService.get<string>('scraper.model')!;
 
     this.logger.log(`Starting scrape of ${model} listings...`);
 
-    while (queue.length > 0 && visited.size < this.maxPages) {
-      const url = queue.shift()!;
-      if (visited.has(url)) {
-        continue;
-      }
-      visited.add(url);
-      const pageNum = visited.size;
-
+    for (let page = 1; page <= Math.min(pageCount, this.maxPages); page++) {
       try {
-        this.logger.log(`Scraping page ${pageNum}/${this.maxPages}: ${url}`);
+        this.logger.log(
+          `Fetching page ${page}/${Math.min(pageCount, this.maxPages)}`,
+        );
 
-        const html = await this.httpService.fetchPage(url);
-        const pageListings = this.htmlParserService.parsePage(html);
-
-        allListings.push(...pageListings);
+        const result = await this.apiClientService.fetchSearchPage(page);
+        pageCount = result.pageCount;
+        allListings.push(...result.listings);
         successCount++;
 
-        // Discover follow-up pages from the site's own pagination links
-        for (const nextUrl of this.htmlParserService.extractSearchPageUrls(
-          html,
-        )) {
-          if (!visited.has(nextUrl) && !queue.includes(nextUrl)) {
-            queue.push(nextUrl);
-          }
-        }
-        // Fallback: no pagination links found (markup drift) —
-        // continue with the next built URL
-        if (queue.length === 0 && visited.size < this.maxPages) {
-          const fallback = this.httpService.buildSearchUrl(pageNum + 1);
-          if (!visited.has(fallback)) {
-            queue.push(fallback);
-          }
-        }
-
         // Small delay between pages to be polite
-        await this.sleep(1000);
+        if (page < Math.min(pageCount, this.maxPages)) {
+          await this.sleep(1000);
+        }
       } catch (error) {
         failCount++;
         this.logger.warn(
-          `Failed to scrape page ${pageNum} (${url}): ${error instanceof Error ? error.message : 'Unknown error'}`,
+          `Failed to fetch page ${page}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         );
         // Continue to next page on error
       }
@@ -84,7 +61,7 @@ export class ScraperService {
     const uniqueListings = this.deduplicateByUrl(allListings);
 
     this.logger.log(
-      `Scraping complete. Pages: ${successCount}/${this.maxPages} successful, ${failCount} failed. ` +
+      `Scraping complete. Pages: ${successCount} successful, ${failCount} failed. ` +
         `Total listings: ${allListings.length}, Unique: ${uniqueListings.length}`,
     );
 
@@ -106,9 +83,12 @@ export class ScraperService {
 
     for (const raw of listings) {
       try {
-        // Skip listings that no longer resolve to their detail page
-        // (expired ads redirect to the generic search page).
-        const live = await this.httpService.isListingLive(raw.listingUrl);
+        // Skip listings that are no longer active
+        // (the detail API returns 404 or a non-active status).
+        const adId = raw.listingUrl.match(/\/auto-oglasi\/(\d+)/)?.[1];
+        const live = adId
+          ? await this.apiClientService.isListingActive(adId)
+          : true;
         if (!live) {
           expiredCount++;
           this.logger.debug(`Skipping expired listing: ${raw.listingUrl}`);

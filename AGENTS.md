@@ -47,7 +47,7 @@ good car deals/
 | Task                | Location                                  | Notes                                          |
 | ------------------- | ----------------------------------------- | ---------------------------------------------- |
 | REST endpoints      | `good-car-deals-api/src/deals/`           | Controller + service                           |
-| Scraping logic      | `good-car-deals-api/src/scraper/`         | HTTP client (impit), HTML parser (cheerio)     |
+| Scraping logic      | `good-car-deals-api/src/scraper/`         | JSON API client (Next.js data + core API)      |
 | Deal classification | `good-car-deals-api/src/analysis/`        | `deal-classifier.service.ts` + `deal-stats.ts` |
 | DB schema           | `good-car-deals-api/prisma/schema.prisma` | Single `Listing` model, 4 secondary indexes    |
 | Frontend pages      | `good-car-deals-frontend/src/app/`        | App Router (layout, page, robots, sitemap)     |
@@ -64,7 +64,7 @@ good car deals/
 - **UI**: shadcn/ui (Radix Luma style) + Lucide icons
 - **Data**: TanStack React Query v5 for client-side data fetching
 - **DB**: Prisma with PostgreSQL — `BigInt` IDs, snake_case column mapping via `@map()`
-- **Scraping**: `impit` for HTTP + TLS fingerprint impersonation, `cheerio` for HTML parsing
+- **Scraping**: `impit` transport → Next.js `/_next/data` search JSON + `core.polovniautomobili.com/api/v1` detail API; `cheerio` parser kept only as legacy fallback
 - **Deal scoring**: v2 comps-relative — per-model OLS/cell-median expected price → % deviation → 5-tier badge + 0–100 score (`good-car-deals-api/src/analysis/deal-stats.ts`)
 - **Residential proxy**: Optional — set `SCRAPER_PROXY_URL` env var if using a proxy service
 - **Monorepo**: npm workspaces, shared types package consumed from source (no build step)

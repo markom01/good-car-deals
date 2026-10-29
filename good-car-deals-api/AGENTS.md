@@ -35,11 +35,12 @@ src/
 
 ## SCRAPING PIPELINE
 
-1. **HttpService** — `impit` with Chrome TLS fingerprint. 3 retries with exponential backoff. Retries on timeout, 403, 503, network errors. `buildSearchPage(page)` constructs `polovniautomobili.com` URL with brand + model params. Supports optional `SCRAPER_PROXY_URL` for residential proxy.
-2. **HtmlParserService** — `cheerio` parses listing cards. Handles two card types: featured `<section>` and regular `<article>`. Extracts title, URL, price, year, mileage, fuel, engine, power, transmission, location. Falls back through specs → info div → title regex for year.
-3. **ScraperService** — Loops pages 1-15 with 1s delay between requests. Deduplicates by `listingUrl`. Upserts into DB. 1 page failure doesn't stop the rest.
-4. **CronService** — `@Cron(CronExpression.EVERY_WEEK)`. Orchestrates scrape → save → classify. Errors don't crash the app, existing DB data preserved.
-5. **Startup** — With `SKIP_STARTUP_SCRAPE=true`, skips scraping (Render gets 403). With `--scrape` flag, runs scrape-only mode and exits.
+1. **HttpService** — `impit` with Chrome TLS fingerprint. 3 retries with exponential backoff. Retries on timeout, 403, 503, network errors. `fetchPage` returns HTML, `fetchJson` returns parsed JSON; non-2xx throws `HttpError` with `status`. Supports optional `SCRAPER_PROXY_URL` for residential proxy.
+2. **ApiClientService** — primary data source. `fetchSearchPage(page)` calls the site's Next.js data endpoint `/_next/data/<buildId>/auto-oglasi/pretraga.json` (buildId read from `__NEXT_DATA__`, refreshed once on 404) and maps JSON results into `RawListingData`. `isListingActive(adId)` checks `core.polovniautomobili.com/api/v1/classifieds/car/{id}` (`status === 'active'`, 404 → expired, other errors → assume live).
+3. **ScraperService** — Loops pages `1..min(pageCount, 15)` with 1s delay between requests. Deduplicates by `listingUrl` (`https://www.polovniautomobili.com/auto-oglasi/<id>` — id-based, so title edits don't create duplicates). Upserts into DB. 1 page failure doesn't stop the rest.
+4. **HtmlParserService** — legacy DOM parser, kept as reference/fallback only. Production scraping no longer calls `parsePage`; only `normalizePrice`/`normalizeMileage` are used.
+5. **CronService** — `@Cron(CronExpression.EVERY_WEEK)`. Orchestrates scrape → save → classify. Errors don't crash the app, existing DB data preserved.
+6. **Startup** — With `SKIP_STARTUP_SCRAPE=true`, skips scraping (Render gets 403). With `--scrape` flag, runs scrape-only mode and exits.
 
 ## DEAL CLASSIFICATION
 
