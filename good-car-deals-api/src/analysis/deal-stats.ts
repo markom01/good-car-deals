@@ -1,4 +1,8 @@
 // Pure statistics helpers for Deal Score v2 (no Nest, no Prisma, no network).
+// Methodology: Hedonic regression per Lancaster (1966), Griliches (1961), MedCrave (2015).
+// Semi-log form: log(price) ~ 1 + age + km + age×km [+ kw] [+ diesel] [+ auto]
+// 10-obs-per-predictor rule (Vittinghoff & McCulloch 2007) → min 30 for base, 60 for full.
+// Out-of-sample predictions fall back to cell-median (comps), never extrapolate.
 // See docs/superpowers/specs/2026-10-27-deal-score-v2-design.md.
 
 export type TierName =
@@ -20,6 +24,8 @@ export interface PriceModel {
   intercept: number;
   coefAge: number;
   coefKm: number;
+  /** Interaction term: extra depreciation when old AND high-km (non-linear). */
+  coefAgeKm: number;
   /** Log-price effect of one kW — present only when the power term survived the guards. */
   coefKw?: number;
   /**
@@ -33,15 +39,13 @@ export interface PriceModel {
   /** Automatic dummy coefficient — present only when both transmission classes ≥ 10 rows. */
   coefAuto?: number;
   n: number;
-  /**
-   * Training-sample bounds. `expectedPrice` clamps age/km to these: log-price
-   * extrapolation beyond the sample decays toward zero (e^-232 absurdity), so
-   * out-of-sample rows are valued at the nearest observed boundary instead.
-   */
+  /** Training-sample bounds for leverage detection. */
   minAge: number;
   maxAge: number;
   minKm: number;
   maxKm: number;
+  /** Hat-matrix diagonals for leverage diagnostics (max per observation). */
+  maxLeverage: number;
 }
 
 /** Per-row engine-trim attributes used by the fit and by `expectedPrice`. */
@@ -51,108 +55,56 @@ export interface FitAttrs {
   auto?: boolean | null;
 }
 
-function quantile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return NaN;
-  const pos = (sorted.length - 1) * p;
-  const base = Math.floor(pos);
-  const rest = pos - base;
-  return sorted[base + 1] !== undefined
-    ? sorted[base] + rest * (sorted[base + 1] - sorted[base])
-    : sorted[base];
-}
-
-/**
- * Trim outliers using the Tukey IQR fence: kept values lie inside
- * [Q1 - 1.5*IQR, Q3 + 1.5*IQR]. Returns the kept values and the fences.
- */
-export function iqrTrimmed(values: number[]): {
-  kept: number[];
-  lo: number;
-  hi: number;
-} {
-  const sorted = [...values].sort((a, b) => a - b);
-  const q1 = quantile(sorted, 0.25);
-  const q3 = quantile(sorted, 0.75);
-  const iqr = q3 - q1;
-  const lo = q1 - 1.5 * iqr;
-  const hi = q3 + 1.5 * iqr;
-  return { kept: values.filter((v) => v >= lo && v <= hi), lo, hi };
-}
-
-export function median(values: number[]): number {
-  if (values.length === 0) return NaN;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
-}
-
-/**
- * Solve the p×p system S * c = T by Gauss-Jordan elimination with partial
- * pivoting. Returns the coefficient vector, or null when singular
- * (|pivot| < 1e-9).
- */
-function solveN(S: number[][], T: number[]): number[] | null {
-  const p = T.length;
-  const m: number[][] = S.map((row, i) => [...row, T[i]]);
-  for (let col = 0; col < p; col++) {
-    let piv = col;
-    for (let r = col + 1; r < p; r++) {
-      if (Math.abs(m[r][col]) > Math.abs(m[piv][col])) piv = r;
-    }
-    if (Math.abs(m[piv][col]) < 1e-9) return null;
-    if (piv !== col) {
-      const tmp = m[col];
-      m[col] = m[piv]!;
-      m[piv] = tmp;
-    }
-    for (let r = 0; r < p; r++) {
-      if (r === col) continue;
-      const f = m[r][col] / m[col][col];
-      for (let c = col; c <= p; c++) m[r][c] -= f * m[col][c];
-    }
-  }
-  return m.map((row, i) => row[p] / row[i]);
+/** Result of a fit attempt with diagnostics. */
+export interface FitResult {
+  model: PriceModel | null;
+  /** Rows used in the final fit (after IQR trim). */
+  fitRows: ({ age: number; km: number; price: number } & FitAttrs)[];
+  /** All usable rows (after IQR trim, before predictor-specific filtering). */
+  usableRows: ({ age: number; km: number; price: number } & FitAttrs)[];
+  /** Diagnostics. */
+  diagnostics: {
+    rSquared: number;
+    adjRSquared: number;
+    maxLeverage: number;
+    maxCooksD: number;
+    conditionNumber: number;
+  } | null;
 }
 
 /** Minimum rows in BOTH classes for a dummy (fuel/transmission) term. */
 const MIN_DUMMY_CLASS = 10;
 
+/** 1-in-10 rule: minimum usable rows = 10 × (base predictors + optional terms). */
+const MIN_USABLE_BASE = 30; // 10 × 3 (intercept, age, km) + interaction term
+const MIN_USABLE_FULL = 60; // 10 × 6 (base + kw + diesel + auto)
+
 /**
- * OLS fit of log(price) ~ 1 + age + km [+ kw] [+ diesel] [+ auto] on
- * IQR-trimmed rows. Fitting the log keeps depreciation multiplicative, so
- * expected prices stay positive and never collapse toward zero for old,
- * high-mileage cars (the failure mode of a raw-price linear fit).
+ * OLS fit of log(price) ~ 1 + age + km + age×km [+ kw] [+ diesel] [+ auto] on
+ * IQR-trimmed rows. Semi-log (hedonic) form keeps depreciation multiplicative.
  *
- * Optional engine-trim terms, each behind a guard so a thin column can
- * never destabilize the base fit:
- * - kw (power in kW): used only when ≥ 12 usable rows carry a kW value
- *   with ≥ 2 distinct values; the fit then runs on those rows only. A
- *   wrong-sign coefficient (≤ 0 — power must raise price) drops the term
- *   and the fit falls back to the plain age+km spec on all usable rows.
- * - diesel / auto dummies: used only when BOTH classes have ≥ 10 rows in
- *   the fit set. Missing attributes count as the 0 side.
+ * Returns null when:
+ * - fewer than 30 usable rows (base) / 60 (full) survive trimming
+ * - normal equations are singular (condition number > 1e12)
+ * - base coefficients have wrong sign (coefAge >= 0 || coefKm >= 0)
+ * - leverage too high (max h_ii > 2p/n) or influence too high (Cook's D > 4/n)
  *
- * Returns null when fewer than 12 rows survive trimming, the normal
- * equations are singular, or a base coefficient has the wrong sign
- * (coefAge >= 0 || coefKm >= 0). n = rows actually used in the fit.
+ * n = rows actually used in the fit. Diagnostics included for validation.
  */
 export function fitPriceModel(
   rows: ({ age: number; km: number; price: number } & FitAttrs)[],
-): PriceModel | null {
+): FitResult | null {
   const positive = rows.filter((r) => r.price > 0);
   const { kept } = iqrTrimmed(positive.map((r) => r.price));
   const usable = positive.filter((r) => kept.includes(r.price));
-  if (usable.length < 12) return null;
 
   const kwRows = usable.filter(
     (r) => r.kw !== null && r.kw !== undefined && Number.isFinite(r.kw),
   );
   const useKw =
-    kwRows.length >= 12 && new Set(kwRows.map((r) => r.kw)).size >= 2;
+    kwRows.length >= MIN_USABLE_FULL &&
+    new Set(kwRows.map((r) => r.kw)).size >= 2;
   const fitRows = useKw ? kwRows : usable;
-  // Fit-sample mean kW, for scoring rows that lack a kW value.
   const fitKwMean = useKw
     ? kwRows.reduce((s, r) => s + (r.kw ?? 0), 0) / kwRows.length
     : undefined;
@@ -166,12 +118,24 @@ export function fitPriceModel(
     autoCount >= MIN_DUMMY_CLASS &&
     fitRows.length - autoCount >= MIN_DUMMY_CLASS;
 
-  // 1) Full candidate spec (power + guarded dummies). A singular matrix,
-  //    bad base sign, or wrong-sign power term → null here.
-  const full = fitSpecModel(fitRows, useKw, useDiesel, useAuto, fitKwMean);
+  const minUsable = useKw ? MIN_USABLE_FULL : MIN_USABLE_BASE;
+  if (fitRows.length < minUsable) {
+    return null;
+  }
+
+  // Try full spec with interaction
+  const full = fitSpecModel(
+    fitRows,
+    useKw,
+    useDiesel,
+    useAuto,
+    fitKwMean,
+    true,
+  );
   if (full) return full;
-  // 2) Plain age+km spec on ALL usable rows — the pre-power-term behavior.
-  return fitSpecModel(usable, false, false, false);
+
+  // Fallback: plain age+km+age×km on ALL usable rows
+  return fitSpecModel(usable, false, false, false, undefined, true);
 }
 
 function fitSpecModel(
@@ -180,44 +144,72 @@ function fitSpecModel(
   useDiesel: boolean,
   useAuto: boolean,
   fitKwMean?: number,
-): PriceModel | null {
-  const p = 3 + (useKw ? 1 : 0) + (useDiesel ? 1 : 0) + (useAuto ? 1 : 0);
-  const S: number[][] = Array.from({ length: p }, () =>
-    Array<number>(p).fill(0),
-  );
-  const T: number[] = new Array<number>(p).fill(0);
+  includeInteraction: boolean = true,
+): FitResult | null {
+  const n = rows.length;
+  const p =
+    3 +
+    (includeInteraction ? 1 : 0) +
+    (useKw ? 1 : 0) +
+    (useDiesel ? 1 : 0) +
+    (useAuto ? 1 : 0);
+
+  // Build design matrix X (n × p) and response vector y
+  const X: number[][] = [];
+  const y: number[] = [];
   for (const r of rows) {
     const x: number[] = [1, r.age, r.km];
+    if (includeInteraction) x.push((r.age * r.km) / 1e6); // scaled for numerical stability
     if (useKw) x.push(r.kw!);
     if (useDiesel) x.push(r.diesel === true ? 1 : 0);
     if (useAuto) x.push(r.auto === true ? 1 : 0);
-    for (let i = 0; i < p; i++) {
-      T[i] += x[i] * Math.log(r.price);
-      for (let j = 0; j < p; j++) S[i][j] += x[i] * x[j];
-    }
+    X.push(x);
+    y.push(Math.log(r.price));
   }
 
-  const coef = solveN(S, T);
-  if (!coef) return null;
-  if (![coef[0], coef[1], coef[2]].every(Number.isFinite)) return null;
-  if (coef[1] >= 0 || coef[2] >= 0) return null;
+  // Solve (X'X)β = X'y using QR decomposition (more stable than normal equations)
+  const result = qrSolve(X, y, p);
+  if (!result.coef || !result.diagnostics) return null;
+  const { coef, diagnostics } = result;
 
-  const kwIdx = 3;
-  const dieselIdx = 3 + (useKw ? 1 : 0);
+  // Coefficient indices
+  const idxIntercept = 0;
+  const idxAge = 1;
+  const idxKm = 2;
+  const idxAgeKm = includeInteraction ? 3 : -1;
+  const kwIdx = 3 + (includeInteraction ? 1 : 0);
+  const dieselIdx = kwIdx + (useKw ? 1 : 0);
   const autoIdx = dieselIdx + (useDiesel ? 1 : 0);
+
+  // Base coefficient sign checks (depreciation must be negative)
+  if (coef[idxAge] >= 0 || coef[idxKm] >= 0) return null;
+  if (includeInteraction && coef[idxAgeKm] > 0) return null; // interaction should not reverse depreciation
+
+  // Power term sign check
   if (useKw) {
     if (!Number.isFinite(coef[kwIdx]) || coef[kwIdx] <= 0) return null;
   }
 
+  // Diagnostics checks (leverage & influence)
+  if (diagnostics.maxLeverage > (2 * p) / n) return null;
+  if (diagnostics.maxCooksD > 4 / n) return null;
+  if (diagnostics.conditionNumber > 1e12) return null;
+  // Degenerate fit: very negative R-squared indicates fit is much worse than
+  // a horizontal line (intercept only). This catches flat-price data with
+  // varying predictors where spurious correlations create nonsense fits.
+  if (diagnostics.rSquared < -1) return null;
+
   const model: PriceModel = {
-    intercept: coef[0],
-    coefAge: coef[1],
-    coefKm: coef[2],
-    n: rows.length,
+    intercept: coef[idxIntercept],
+    coefAge: coef[idxAge],
+    coefKm: coef[idxKm],
+    coefAgeKm: includeInteraction ? coef[idxAgeKm] : 0,
+    n: n,
     minAge: Math.min(...rows.map((r) => r.age)),
     maxAge: Math.max(...rows.map((r) => r.age)),
     minKm: Math.min(...rows.map((r) => r.km)),
     maxKm: Math.max(...rows.map((r) => r.km)),
+    maxLeverage: diagnostics.maxLeverage,
   };
   if (useKw) {
     model.coefKw = coef[kwIdx]!;
@@ -225,7 +217,106 @@ function fitSpecModel(
   }
   if (useDiesel) model.coefDiesel = coef[dieselIdx]!;
   if (useAuto) model.coefAuto = coef[autoIdx]!;
-  return model;
+  return { model, fitRows: rows, usableRows: rows, diagnostics };
+}
+
+/**
+ * QR decomposition solver for OLS: more numerically stable than normal equations.
+ * Returns coefficients and diagnostics (leverage, Cook's D, condition number).
+ */
+function qrSolve(
+  X: number[][],
+  y: number[],
+  p: number,
+): {
+  coef: number[] | null;
+  diagnostics: {
+    rSquared: number;
+    adjRSquared: number;
+    maxLeverage: number;
+    maxCooksD: number;
+    conditionNumber: number;
+  } | null;
+} {
+  const n = X.length;
+  if (n < p) return { coef: null, diagnostics: null };
+
+  // Build X as matrix, compute QR via Gram-Schmidt (stable for small p)
+  const Q: number[][] = Array.from({ length: n }, () =>
+    Array<number>(p).fill(0),
+  );
+  const R: number[][] = Array.from({ length: p }, () =>
+    Array<number>(p).fill(0),
+  );
+
+  for (let j = 0; j < p; j++) {
+    const v: number[] = X.map((row) => row[j]);
+    for (let i = 0; i < j; i++) {
+      const rij = X.map((row, k) => row[i] * v[k]).reduce((a, b) => a + b, 0);
+      R[i][j] = rij;
+      for (let k = 0; k < n; k++) v[k] -= rij * Q[k][i];
+    }
+    const norm = Math.sqrt(v.reduce((a, b) => a + b * b, 0));
+    if (norm < 1e-12) return { coef: null, diagnostics: null }; // singular
+    R[j][j] = norm;
+    for (let k = 0; k < n; k++) Q[k][j] = v[k] / norm;
+  }
+
+  // Q'y
+  const QTy: number[] = Array<number>(p).fill(0);
+  for (let j = 0; j < p; j++) {
+    for (let i = 0; i < n; i++) QTy[j] += Q[i][j] * y[i];
+  }
+
+  // Back-substitution: Rβ = Q'y
+  const coef = Array(p).fill(0);
+  for (let i = p - 1; i >= 0; i--) {
+    let sum = QTy[i];
+    for (let j = i + 1; j < p; j++) sum -= R[i][j] * coef[j];
+    coef[i] = sum / R[i][i];
+  }
+
+  // Diagnostics
+  const yHat = X.map((row) => row.reduce((s, xj, j) => s + xj * coef[j], 0));
+  const residuals = y.map((yi, i) => yi - yHat[i]);
+  const rss = residuals.reduce((s, r) => s + r * r, 0);
+  const tss = y.reduce(
+    (s, yi) => s + (yi - y.reduce((a, b) => a + b, 0) / n) ** 2,
+    0,
+  );
+  const rSquared = 1 - rss / tss;
+  const adjRSquared = 1 - ((1 - rSquared) * (n - 1)) / (n - p);
+
+  // Hat matrix diagonal (leverage): h_ii = sum_j Q_ij^2
+  const leverage: number[] = Array<number>(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < p; j++) leverage[i] += Q[i][j] * Q[i][j];
+  }
+  const maxLeverage = Math.max(...leverage);
+
+  // Cook's distance
+  const mse = rss / (n - p);
+  let maxCooksD = 0;
+  for (let i = 0; i < n; i++) {
+    const di =
+      (residuals[i] ** 2 / (p * mse)) * (leverage[i] / (1 - leverage[i]) ** 2);
+    maxCooksD = Math.max(maxCooksD, di);
+  }
+
+  // Condition number of X (via R diagonal)
+  const rDiag = R.map((row, i) => row[i]).filter((v) => v > 0);
+  const conditionNumber = Math.max(...rDiag) / Math.min(...rDiag);
+
+  return {
+    coef,
+    diagnostics: {
+      rSquared,
+      adjRSquared,
+      maxLeverage,
+      maxCooksD,
+      conditionNumber,
+    },
+  };
 }
 
 export function expectedPrice(
@@ -234,15 +325,14 @@ export function expectedPrice(
   km: number,
   attrs?: FitAttrs,
 ): number {
-  // Never extrapolate: log-price predictions outside the training range decay
-  // toward zero (age 30 / 600k km once produced e^-232). Value the row at the
-  // nearest observed boundary instead.
-  const a = Math.min(Math.max(age, m.minAge), m.maxAge);
-  const k = Math.min(Math.max(km, m.minKm), m.maxKm);
-  let p = m.intercept + m.coefAge * a + m.coefKm * k;
+  // IN-SAMPLE ONLY: if age/km outside training range, return NaN to signal fallback
+  const inSample =
+    age >= m.minAge && age <= m.maxAge && km >= m.minKm && km <= m.maxKm;
+  if (!inSample) return NaN;
+
+  const ageKmTerm = (m.coefAgeKm || 0) * ((age * km) / 1e6);
+  let p = m.intercept + m.coefAge * age + m.coefKm * km + ageKmTerm;
   if (m.coefKw !== undefined) {
-    // Missing kW → fit-sample mean (unbiased in expectation). kw=0 would
-    // understate rows the fit never saw (see PriceModel.meanKw).
     const kw =
       attrs?.kw !== null && attrs?.kw !== undefined
         ? attrs.kw
@@ -259,10 +349,8 @@ export function expectedPrice(
 }
 
 /**
- * Final safety net: keep a fitted expectation inside the group's observed
- * price range (IQR-trimmed, so a €100 part-out cannot become the floor).
- * The log fit already prevents negative prices; this stops a pathological
- * in-sample fit from inventing a price the market never showed.
+ * Clamp a fitted expectation to the group's IQR-trimmed observed price range.
+ * Safety net only — the log fit + in-sample check should already prevent extremes.
  */
 export function clampExpected(value: number, prices: number[]): number {
   if (prices.length === 0) return value;
@@ -283,17 +371,14 @@ export function deviationPct(expected: number, price: number): number {
   return ((expected - price) / expected) * 100;
 }
 
-/** 50 + dev*4 clamped to [0,100] and rounded. Positive dev → better score.
- * Kept for the absolute dealScore scale; the market percentile scale is
- * `percentileScores`. */
+/** 50 + dev*4 clamped to [0,100] and rounded. Positive dev → better score. */
 export function dealScoreFromDeviation(dev: number): number {
   return Math.max(0, Math.min(100, Math.round(50 + dev * 4)));
 }
 
 /**
  * Market percentile score: each deviation's rank position mapped to 0..100.
- * Best deviation → 100, worst → 0, single rated row → 50. Deterministic
- * tie-break by input index (equal deviations get adjacent, distinct scores).
+ * Best deviation → 100, worst → 0, single rated row → 50.
  */
 export function percentileScores(devs: number[]): number[] {
   const n = devs.length;
@@ -334,12 +419,43 @@ export function cellMedianExpected(
   const inKm = inYear.filter(
     (r) => r.km >= targetKm * 0.8 && r.km <= targetKm * 1.2,
   );
-  // Median over IQR-trimmed prices (design doc §1: a part-out inside the
-  // window must not shift the median).
   if (inKm.length >= 3) {
     const kept = iqrTrimmed(inKm.map((r) => r.price)).kept;
     return kept.length > 0 ? median(kept) : null;
   }
   const keptYear = iqrTrimmed(inYear.map((r) => r.price)).kept;
   return keptYear.length > 0 ? median(keptYear) : null;
+}
+
+function quantile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return NaN;
+  const pos = (sorted.length - 1) * p;
+  const base = Math.floor(pos);
+  const rest = pos - base;
+  return sorted[base + 1] !== undefined
+    ? sorted[base] + rest * (sorted[base + 1] - sorted[base])
+    : sorted[base];
+}
+
+export function iqrTrimmed(values: number[]): {
+  kept: number[];
+  lo: number;
+  hi: number;
+} {
+  const sorted = [...values].sort((a, b) => a - b);
+  const q1 = quantile(sorted, 0.25);
+  const q3 = quantile(sorted, 0.75);
+  const iqr = q3 - q1;
+  const lo = q1 - 1.5 * iqr;
+  const hi = q3 + 1.5 * iqr;
+  return { kept: values.filter((v) => v >= lo && v <= hi), lo, hi };
+}
+
+export function median(values: number[]): number {
+  if (values.length === 0) return NaN;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[mid - 1] + sorted[mid]) / 2
+    : sorted[mid];
 }

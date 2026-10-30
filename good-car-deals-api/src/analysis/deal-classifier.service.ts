@@ -124,7 +124,7 @@ export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
       }
     }
 
-    const fit = fitPriceModel(
+    const fitResult = fitPriceModel(
       usable.map((r) => ({
         age: r.age!,
         km: r.mileageKm!,
@@ -135,18 +135,34 @@ export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
       })),
     );
 
-    if (fit) {
-      // Keep fitted expectations inside the group's observed p10..p90 band:
-      // the fit must refine the market, not invent prices far outside it.
+    if (fitResult?.model) {
+      const model = fitResult.model;
       const groupPrices = usable.map((r) => r.priceNumeric!);
       for (const r of usable) {
-        const raw = expectedPrice(fit, r.age!, r.mileageKm!, {
+        // expectedPrice returns NaN for out-of-sample (age/km outside training range)
+        const raw = expectedPrice(model, r.age!, r.mileageKm!, {
           kw: r.powerKw,
           diesel: r.fuelType === 'Dizel',
           auto: r.transmission === 'Automatic',
         });
-        const exp = clampExpected(raw, groupPrices);
-        results.set(r.id, scoreRow(r.id, exp, r.priceNumeric!));
+        // Out-of-sample → fallback to cell median (comps), not clamping
+        const exp = Number.isFinite(raw)
+          ? clampExpected(raw, groupPrices)
+          : cellMedianExpected(
+              usable.map((u) => ({
+                price: u.priceNumeric!,
+                year: u.year!,
+                km: u.mileageKm!,
+              })),
+              r.year!,
+              r.mileageKm!,
+            );
+        results.set(
+          r.id,
+          exp === null
+            ? UNRATED_RESULT(r.id)
+            : scoreRow(r.id, exp, r.priceNumeric!),
+        );
       }
     } else {
       const cellRows = usable.map((u) => ({

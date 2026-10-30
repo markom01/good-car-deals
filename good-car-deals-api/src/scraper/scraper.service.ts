@@ -8,14 +8,16 @@ import { Listing } from '@prisma/client';
 @Injectable()
 export class ScraperService {
   private readonly logger = new Logger(ScraperService.name);
-  /** Safety cap only — pagination stops at the pageCount the API reports. */
-  private readonly maxPages = 100;
 
   constructor(
     private apiClientService: ApiClientService,
     private htmlParserService: HtmlParserService,
     private prismaService: PrismaService,
   ) {}
+
+  private get maxPages(): number {
+    return Number(process.env.SCRAPER_MAX_PAGES) || 100;
+  }
 
   /**
    * Scrape the site-wide search feed (up to maxPages).
