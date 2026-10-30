@@ -2,11 +2,16 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Impit, HTTPStatusError, TimeoutError } from 'impit';
 
+/** Non-2xx response, carrying the status so callers can react to 404s. */
+export class HttpError extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP error: ${status}`);
+    this.name = 'HttpError';
+  }
+}
+
 @Injectable()
 export class HttpService {
-  private readonly baseUrl: string;
-  private readonly brand: string;
-  private readonly model: string;
   private readonly timeout = 10000;
   private readonly maxRetries = 3;
   private readonly headers = {
@@ -19,10 +24,6 @@ export class HttpService {
   private readonly impit: Impit;
 
   constructor(private configService: ConfigService) {
-    this.baseUrl = this.configService.get<string>('scraper.targetUrl')!;
-    this.brand = this.configService.get<string>('scraper.brand')!;
-    this.model = this.configService.get<string>('scraper.model')!;
-
     const opts: Record<string, unknown> = {
       browser: 'firefox',
       timeout: this.timeout,
@@ -45,18 +46,32 @@ export class HttpService {
    * @returns The HTML content as a string
    */
   async fetchPage(url: string): Promise<string> {
+    return this.request(url, this.headers.Accept);
+  }
+
+  /**
+   * Fetch a JSON endpoint with the same retry/proxy behaviour as fetchPage.
+   * @param url - JSON endpoint
+   * @returns Parsed response body
+   */
+  async fetchJson<T>(url: string): Promise<T> {
+    const body = await this.request(url, 'application/json, text/plain, */*');
+    return JSON.parse(body) as T;
+  }
+
+  private async request(url: string, accept: string): Promise<string> {
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         const response = await this.impit.fetch(url, {
-          headers: this.headers,
+          headers: { ...this.headers, Accept: accept },
           timeout: this.timeout,
         });
 
         // Check for HTTP errors
         if (!response.ok) {
-          throw new Error(`HTTP error: ${response.status}`);
+          throw new HttpError(response.status);
         }
 
         return await response.text();
@@ -114,26 +129,6 @@ export class HttpService {
     } catch {
       return true; // Cannot verify — assume live.
     }
-  }
-
-  /**
-   * Build search URL with brand/model.
-   * Mirrors the site's canonical link format exactly
-   * (e.g. ?brand=Opel&model[]=Astra+J&page=2&sort=basic):
-   * lowercase/hyphenated slugs return page 1 content for every
-   * page number, so case and spacing must be preserved.
-   * @param page - Page number (1-based)
-   * @returns The constructed URL
-   */
-  buildSearchUrl(page: number): string {
-    const separator = this.baseUrl.includes('?') ? '&' : '?';
-    // Preserve model spacing as "+" (site canonical form, not hyphenated)
-    const modelParam = this.model.trim().replace(/\s+/g, '+');
-    // Capitalize brand ("opel" → "Opel"), keep the rest untouched
-    // so already-correct values ("BMW") survive
-    const brandParam = this.brand.charAt(0).toUpperCase() + this.brand.slice(1);
-
-    return `${this.baseUrl}${separator}brand=${brandParam}&model[]=${modelParam}&page=${page}&sort=basic&damaged[]=notDamaged&onlyWithPrice=true&showOldNew=old`;
   }
 
   /**

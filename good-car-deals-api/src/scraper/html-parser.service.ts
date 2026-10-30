@@ -7,6 +7,9 @@ type CheerioElement = cheerio.Cheerio<Element>;
 
 export interface RawListingData {
   title: string;
+  /** Brand and model as reported by the site's feed (scrape is site-wide). */
+  brand?: string;
+  model?: string;
   listingUrl: string;
   price: string;
   priceNote: string;

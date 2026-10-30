@@ -12,7 +12,9 @@ export class DealsService {
   /**
    * Get good deals only (v2 gate: dealType GREAT DEAL or GOOD DEAL), sorted
    * by the given sort option, with the per-model pooled expected-price
-   * average and per-listing percentage from that average.
+   * average and per-listing percentage from that average. When the model
+   * window is thinner than 3 rated rows, the row's own expected price is
+   * used instead so every card can show the comparison.
    */
   async getDeals(sort: DealSort = DealSort.SCORE): Promise<Listing[]> {
     this.logger.log(`Fetching deals (GREAT/GOOD) sorted by ${sort}`);
@@ -67,6 +69,10 @@ export class DealsService {
             window.reduce((sum, p) => sum + p.expectedPrice, 0) / window.length;
         }
       }
+
+      // Thin model window → compare against the row's own expected price.
+      // Every GREAT/GOOD deal is rated, so the card always has a comparison.
+      modelAvg ??= listing.expectedPrice;
 
       let pct: number | null = null;
       if (

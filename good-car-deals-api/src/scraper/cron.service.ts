@@ -23,10 +23,9 @@ export class CronService {
     const cronSchedule = this.configService.get<string>(
       'scraper.cronSchedule',
     )!;
-    const model = this.configService.get<string>('scraper.model')!;
 
     this.logger.log(`Cron job triggered (schedule: ${cronSchedule})`);
-    this.logger.log(`Starting weekly scrape of ${model} listings...`);
+    this.logger.log('Starting weekly scrape (all brands)...');
 
     const startTime = Date.now();
 

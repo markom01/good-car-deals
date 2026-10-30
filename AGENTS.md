@@ -7,7 +7,7 @@
 
 ## OVERVIEW
 
-Scrapes classified car listings from `polovniautomobili.com`, classifies deals by score, serves via REST API, displays in Next.js. Brand/model configured via env vars.
+Scrapes classified car listings from `polovniautomobili.com` site-wide (all brands), classifies deals by score, serves via REST API, displays in Next.js. Model is read per listing from the feed ("Opel Astra").
 
 **Key constraint**: polovniautomobili.com blocks ALL cloud IPs (403). Scraper must run from a residential IP.
 
@@ -17,7 +17,7 @@ Scrapes classified car listings from `polovniautomobili.com`, classifies deals b
 Local PC (Windows Task Scheduler — weekly Sunday 00:00)
   └─ scrape-local.bat
        └─ NestJS CLI --scrape mode → impit scrapes polovniautomobili.com (home IP)
-            └─ Saves 362+ listings → Neon PostgreSQL (free tier)
+            └─ Saves ~2.5k listings → Neon PostgreSQL (free tier)
                  └─ Render (free) serves NestJS API → port 10000
                       └─ Vercel (free) serves Next.js frontend → CDN
 ```
@@ -47,7 +47,7 @@ good car deals/
 | Task                | Location                                  | Notes                                          |
 | ------------------- | ----------------------------------------- | ---------------------------------------------- |
 | REST endpoints      | `good-car-deals-api/src/deals/`           | Controller + service                           |
-| Scraping logic      | `good-car-deals-api/src/scraper/`         | HTTP client (impit), HTML parser (cheerio)     |
+| Scraping logic      | `good-car-deals-api/src/scraper/`         | JSON API client (Next.js data + core API)      |
 | Deal classification | `good-car-deals-api/src/analysis/`        | `deal-classifier.service.ts` + `deal-stats.ts` |
 | DB schema           | `good-car-deals-api/prisma/schema.prisma` | Single `Listing` model, 4 secondary indexes    |
 | Frontend pages      | `good-car-deals-frontend/src/app/`        | App Router (layout, page, robots, sitemap)     |
@@ -64,7 +64,7 @@ good car deals/
 - **UI**: shadcn/ui (Radix Luma style) + Lucide icons
 - **Data**: TanStack React Query v5 for client-side data fetching
 - **DB**: Prisma with PostgreSQL — `BigInt` IDs, snake_case column mapping via `@map()`
-- **Scraping**: `impit` for HTTP + TLS fingerprint impersonation, `cheerio` for HTML parsing
+- **Scraping**: `impit` transport → Next.js `/_next/data` search JSON + `core.polovniautomobili.com/api/v1` detail API; `cheerio` parser kept only as legacy fallback
 - **Deal scoring**: v2 comps-relative — per-model OLS/cell-median expected price → % deviation → 5-tier badge + 0–100 score (`good-car-deals-api/src/analysis/deal-stats.ts`)
 - **Residential proxy**: Optional — set `SCRAPER_PROXY_URL` env var if using a proxy service
 - **Monorepo**: npm workspaces, shared types package consumed from source (no build step)
@@ -78,8 +78,8 @@ good car deals/
 | `DATABASE_URL`             | Render + .env | Neon PostgreSQL connection string                                               |
 | `SKIP_STARTUP_SCRAPE=true` | Render        | Don't scrape on Render (gets 403)                                               |
 | `SCRAPER_TARGET_URL`       | .env          | polovniautomobili.com search URL                                                |
-| `SCRAPER_BRAND`            | .env          | Car brand to search                                                             |
-| `SCRAPER_MODEL`            | .env          | Car model to search                                                             |
+| `SCRAPER_BRAND`            | .env          | Unused — scrape is site-wide (kept optional for old deploys)                    |
+| `SCRAPER_MODEL`            | .env          | Unused — model comes from the feed per listing (kept optional)                  |
 | `CORS_ORIGIN`              | Render        | Optional comma-separated allowlist (unset = allow all)                          |
 | `NEXT_PUBLIC_API_URL`      | Vercel        | Frontend → API URL                                                              |
 | `NEXT_PUBLIC_SITE_URL`     | Vercel        | Canonical site URL for metadata/robots/sitemap (defaults to the vercel.app URL) |

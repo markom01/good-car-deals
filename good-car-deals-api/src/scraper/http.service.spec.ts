@@ -2,6 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from './http.service';
 
+const SEARCH_URL =
+  'https://www.polovniautomobili.com/auto-oglasi/pretraga?sort=basic&onlyWithPrice=true';
+
 describe('HttpService - Real Data Tests (NO MOCKS)', () => {
   let httpService: HttpService;
 
@@ -29,7 +32,7 @@ describe('HttpService - Real Data Tests (NO MOCKS)', () => {
 
   describe('Real HTTP Calls - polovniautomobili.com', () => {
     it('should fetch page successfully (REAL HTTP call)', async () => {
-      const url = httpService.buildSearchUrl(1);
+      const url = SEARCH_URL;
       console.log(`\n  Testing REAL HTTP call to: ${url}...`);
 
       const result = await httpService.fetchPage(url);
@@ -47,7 +50,7 @@ describe('HttpService - Real Data Tests (NO MOCKS)', () => {
       const results: string[] = [];
 
       for (const page of pagesToFetch) {
-        const url = httpService.buildSearchUrl(page);
+        const url = `${SEARCH_URL}&page=${page}`;
         console.log(`  Fetching page ${page}...`);
         const html = await httpService.fetchPage(url);
         results.push(html);
@@ -59,26 +62,6 @@ describe('HttpService - Real Data Tests (NO MOCKS)', () => {
       expect(results[0]).not.toBe(results[1]);
       console.log(`  Successfully fetched ${results.length} real pages`);
     }, 60000); // 60s timeout for multiple real HTTP calls
-
-    it('should build canonical search URLs (pagination-safe)', () => {
-      // Lowercase/hyphenated slugs silently return page 1 content for
-      // every page number — the builder must mirror the site's links.
-      const url2 = httpService.buildSearchUrl(2);
-      expect(url2).toBe(
-        'https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=Opel&model[]=Astra+J&page=2&sort=basic&damaged[]=notDamaged&onlyWithPrice=true&showOldNew=old',
-      );
-    });
-
-    it('should build correct search URL', () => {
-      const url1 = httpService.buildSearchUrl(1);
-      expect(url1).toContain('page=1');
-      // Canonical format: brand=Opel&model[]=Astra+J&page=N&sort=basic
-      expect(url1).toContain('brand=');
-      expect(url1).toContain('model[]=');
-
-      const url5 = httpService.buildSearchUrl(5);
-      expect(url5).toContain('page=5');
-    });
   });
 
   describe('Retry Logic - Real Error Conditions', () => {
