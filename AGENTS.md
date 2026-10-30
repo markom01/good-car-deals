@@ -65,7 +65,7 @@ good car deals/
 - **Data**: TanStack React Query v5 for client-side data fetching
 - **DB**: Prisma with PostgreSQL — `BigInt` IDs, snake_case column mapping via `@map()`
 - **Scraping**: `impit` transport → Next.js `/_next/data` search JSON + `core.polovniautomobili.com/api/v1` detail API; `cheerio` parser kept only as legacy fallback
-- **Deal scoring**: v2 comps-relative — per-model OLS/cell-median expected price → % deviation → 5-tier badge + 0–100 score (`good-car-deals-api/src/analysis/deal-stats.ts`)
+- **Deal scoring**: v2 comps-relative — per-model log-price OLS/cell-median expected price (clamped to observed age/km + price band) → % deviation (capped ±50) → 5-tier badge + 0–100 score (`good-car-deals-api/src/analysis/deal-stats.ts`)
 - **Residential proxy**: Optional — set `SCRAPER_PROXY_URL` env var if using a proxy service
 - **Monorepo**: npm workspaces, shared types package consumed from source (no build step)
 - **API security**: `helmet` on the Express app, `@nestjs/throttler` global guard (100 req/min per IP), optional `CORS_ORIGIN` allowlist (unset = allow all)

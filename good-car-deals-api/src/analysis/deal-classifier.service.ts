@@ -1,11 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  capDeviation,
   cellMedianExpected,
+  clampExpected,
   classifyTier,
   deviationPct,
   expectedPrice,
-  fitLinearPrice,
+  fitPriceModel,
   percentileScores,
   type TierName,
 } from './deal-stats';
@@ -79,7 +81,9 @@ function scoreRow(id: number, expected: number, price: number): ClassifyResult {
   if (expected <= 0 || !Number.isFinite(expected)) {
     return UNRATED_RESULT(id);
   }
-  const dev = deviationPct(expected, price);
+  // Cap the deviation so one bad fit cannot dominate the market percentile
+  // scale (raw values like -3681% existed before the log-price fit).
+  const dev = capDeviation(deviationPct(expected, price));
   if (!Number.isFinite(dev)) {
     return UNRATED_RESULT(id);
   }
@@ -120,7 +124,7 @@ export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
       }
     }
 
-    const fit = fitLinearPrice(
+    const fit = fitPriceModel(
       usable.map((r) => ({
         age: r.age!,
         km: r.mileageKm!,
@@ -132,12 +136,16 @@ export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
     );
 
     if (fit) {
+      // Keep fitted expectations inside the group's observed p10..p90 band:
+      // the fit must refine the market, not invent prices far outside it.
+      const groupPrices = usable.map((r) => r.priceNumeric!);
       for (const r of usable) {
-        const exp = expectedPrice(fit, r.age!, r.mileageKm!, {
+        const raw = expectedPrice(fit, r.age!, r.mileageKm!, {
           kw: r.powerKw,
           diesel: r.fuelType === 'Dizel',
           auto: r.transmission === 'Automatic',
         });
+        const exp = clampExpected(raw, groupPrices);
         results.set(r.id, scoreRow(r.id, exp, r.priceNumeric!));
       }
     } else {

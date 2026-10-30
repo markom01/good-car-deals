@@ -1,9 +1,11 @@
 import { classifyGroups, type ClassifierRow } from './deal-classifier.service';
+import { MAX_DEVIATION_PCT } from './deal-stats';
 
-// Market generator: price = 9625 - 255*age - 4.5*kmThousands + small noise.
-// Rows carry RAW odometer km (mileageKm), generator converts to thousands.
+// Market generator is log-linear:
+// price = 14000 * exp(-0.075*age - 0.0016*kmThousands).
+// Rows carry RAW odometer km (mileageKm), the generator converts to thousands.
 function genPrice(age: number, kmThousands: number): number {
-  return 9625 - 255 * age - 4.5 * kmThousands;
+  return Math.round(14000 * Math.exp(-0.075 * age - 0.0016 * kmThousands));
 }
 
 function makeMarketRows(): ClassifierRow[] {
@@ -80,7 +82,7 @@ function noKmRow(): ClassifierRow {
 }
 
 // 12 usable rows per group is enough for the regression path.
-function makeGroupRows(model: string, offset: number): ClassifierRow[] {
+function makeGroupRows(model: string, factor: number): ClassifierRow[] {
   const rows: ClassifierRow[] = [];
   for (let i = 0; i < 12; i++) {
     const age = 6 + (i % 7) * 2; // 6..18, only even ages
@@ -89,7 +91,7 @@ function makeGroupRows(model: string, offset: number): ClassifierRow[] {
       id: (model === 'Astra J' ? 700 : 712) + i,
       model,
       priceNumeric: Math.round(
-        genPrice(age, kmThousands) + offset + ((i % 5) * 8 - 16),
+        genPrice(age, kmThousands) * factor + ((i % 5) * 8 - 16),
       ),
       year: 2026 - age,
       age,
@@ -215,26 +217,73 @@ describe('classifyGroups', () => {
     expect(out.find((r) => r.id === 902)!.dealScore).toBe(0);
   });
 
-  it('two model groups never share a fit (Astra J + Astra H rows with offset price levels)', () => {
-    const jRows = makeGroupRows('Astra J', 0);
-    const hRows = makeGroupRows('Astra H', 2000);
+  it('two model groups never share a fit (Astra J + Astra H rows with different price levels)', () => {
+    const jRows = makeGroupRows('Astra J', 1);
+    const hRows = makeGroupRows('Astra H', 1.5);
     const out = classifyGroups([...jRows, ...hRows]);
     expect(out).toHaveLength(24);
     for (const r of out) {
       const src = r.id >= 712 ? hRows : jRows;
       const row = src.find((s) => s.id === r.id)!;
       const ownGen =
-        genPrice(row.age!, row.mileageKm! / 1000) + (r.id >= 712 ? 2000 : 0);
+        genPrice(row.age!, row.mileageKm! / 1000) * (r.id >= 712 ? 1.5 : 1);
       expect(Math.abs(r.expectedPrice! - ownGen)).toBeLessThanOrEqual(
         0.1 * ownGen,
       );
     }
   });
 
+  it('extreme age/km row keeps a sane expected price inside the group band', () => {
+    const market = makeMarketRows();
+    const extreme: ClassifierRow = {
+      id: 950,
+      model: 'Astra J',
+      priceNumeric: 1500,
+      year: 2006,
+      age: 20,
+      mileageKm: 500000,
+    };
+    const out = classifyGroups([...market, extreme]);
+    const r = out.find((x) => x.id === 950)!;
+    const prices = market.map((m) => m.priceNumeric!);
+    expect(r.expectedPrice).not.toBeNull();
+    // Raw-price OLS predicted near-zero here; log fit + boundary clamping keep
+    // the expectation inside the observed comparable market.
+    expect(r.expectedPrice!).toBeGreaterThan(1000);
+    expect(r.expectedPrice!).toBeLessThanOrEqual(Math.max(...prices));
+  });
+
+  it(`caps deviations at ±${MAX_DEVIATION_PCT}%`, () => {
+    const market = makeMarketRows();
+    const freeCar: ClassifierRow = {
+      id: 951,
+      model: 'Astra J',
+      priceNumeric: 1,
+      year: 2018,
+      age: 8,
+      mileageKm: 120000,
+    };
+    const overpriced: ClassifierRow = {
+      id: 952,
+      model: 'Astra J',
+      priceNumeric: 100000,
+      year: 2018,
+      age: 8,
+      mileageKm: 120000,
+    };
+    const out = classifyGroups([...market, freeCar, overpriced]);
+    expect(out.find((r) => r.id === 951)!.deviationPct).toBe(MAX_DEVIATION_PCT);
+    expect(out.find((r) => r.id === 952)!.deviationPct).toBe(
+      -MAX_DEVIATION_PCT,
+    );
+    expect(out.find((r) => r.id === 951)!.dealType).toBe('GREAT DEAL');
+    expect(out.find((r) => r.id === 952)!.dealType).toBe('OVERPRICED');
+  });
+
   it('powerKw term: high-kw row priced without premium looks cheap, low-kw row priced at high-kw level looks expensive', () => {
     // 10 age/km pairs; within each pair age+km are identical while kw is
-    // 60 vs 105 and the price carries the 25 €/kW premium → the kw
-    // coefficient is cleanly identified (no collinearity with age/km).
+    // 60 vs 105 and the price carries the kw premium multiplicatively →
+    // the kw coefficient is cleanly identified (no collinearity with age/km).
     const rows: ClassifierRow[] = [];
     let id = 1;
     for (let p = 0; p < 10; p++) {
@@ -245,7 +294,9 @@ describe('classifyGroups', () => {
           id: id++,
           model: 'Astra J',
           priceNumeric: Math.round(
-            genPrice(age, kmThousands) + 25 * kw + ((p % 5) * 8 - 16),
+            genPrice(age, kmThousands) *
+              Math.exp(0.004 * kw) *
+              (1 + ((p % 5) * 0.002 - 0.004)),
           ),
           year: 2026 - age,
           age,
@@ -261,13 +312,13 @@ describe('classifyGroups', () => {
       powerKw: 105,
       priceNumeric: Math.round(genPrice(8, 120)),
     };
-    // Probe B: 60 kW engine priced WITH the 105 kW premium (+1125 €)
+    // Probe B: 60 kW engine priced WITH the 105 kW premium
     // → kw-adjusted expectation is the plain one → negative deviation.
     const probeLow: ClassifierRow = {
       ...belowMarketRow(),
       id: 906,
       powerKw: 60,
-      priceNumeric: Math.round(genPrice(8, 120) + 25 * (105 - 60)),
+      priceNumeric: Math.round(genPrice(8, 120) * Math.exp(0.004 * 105)),
     };
     const out = classifyGroups([...rows, probeHigh, probeLow]);
     const a = out.find((r) => r.id === BELOW_ID)!;

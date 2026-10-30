@@ -16,10 +16,11 @@ export interface PriceRow {
 } // age derived by caller
 
 export interface PriceModel {
+  /** All coefficients live in log-price space: price = exp(intercept + …). */
   intercept: number;
   coefAge: number;
   coefKm: number;
-  /** € per kW (raw kW) — present only when the power term survived the guards. */
+  /** Log-price effect of one kW — present only when the power term survived the guards. */
   coefKw?: number;
   /**
    * Mean kW of the fit sample — present only when `coefKw` is. Rows without
@@ -32,6 +33,15 @@ export interface PriceModel {
   /** Automatic dummy coefficient — present only when both transmission classes ≥ 10 rows. */
   coefAuto?: number;
   n: number;
+  /**
+   * Training-sample bounds. `expectedPrice` clamps age/km to these: log-price
+   * extrapolation beyond the sample decays toward zero (e^-232 absurdity), so
+   * out-of-sample rows are valued at the nearest observed boundary instead.
+   */
+  minAge: number;
+  maxAge: number;
+  minKm: number;
+  maxKm: number;
 }
 
 /** Per-row engine-trim attributes used by the fit and by `expectedPrice`. */
@@ -110,8 +120,10 @@ function solveN(S: number[][], T: number[]): number[] | null {
 const MIN_DUMMY_CLASS = 10;
 
 /**
- * OLS fit of price ~ 1 + age + km [+ kw] [+ diesel] [+ auto] on
- * IQR-trimmed rows.
+ * OLS fit of log(price) ~ 1 + age + km [+ kw] [+ diesel] [+ auto] on
+ * IQR-trimmed rows. Fitting the log keeps depreciation multiplicative, so
+ * expected prices stay positive and never collapse toward zero for old,
+ * high-mileage cars (the failure mode of a raw-price linear fit).
  *
  * Optional engine-trim terms, each behind a guard so a thin column can
  * never destabilize the base fit:
@@ -126,11 +138,12 @@ const MIN_DUMMY_CLASS = 10;
  * equations are singular, or a base coefficient has the wrong sign
  * (coefAge >= 0 || coefKm >= 0). n = rows actually used in the fit.
  */
-export function fitLinearPrice(
+export function fitPriceModel(
   rows: ({ age: number; km: number; price: number } & FitAttrs)[],
 ): PriceModel | null {
-  const { kept } = iqrTrimmed(rows.map((r) => r.price));
-  const usable = rows.filter((r) => kept.includes(r.price));
+  const positive = rows.filter((r) => r.price > 0);
+  const { kept } = iqrTrimmed(positive.map((r) => r.price));
+  const usable = positive.filter((r) => kept.includes(r.price));
   if (usable.length < 12) return null;
 
   const kwRows = usable.filter(
@@ -179,7 +192,7 @@ function fitSpecModel(
     if (useDiesel) x.push(r.diesel === true ? 1 : 0);
     if (useAuto) x.push(r.auto === true ? 1 : 0);
     for (let i = 0; i < p; i++) {
-      T[i] += x[i] * r.price;
+      T[i] += x[i] * Math.log(r.price);
       for (let j = 0; j < p; j++) S[i][j] += x[i] * x[j];
     }
   }
@@ -201,6 +214,10 @@ function fitSpecModel(
     coefAge: coef[1],
     coefKm: coef[2],
     n: rows.length,
+    minAge: Math.min(...rows.map((r) => r.age)),
+    maxAge: Math.max(...rows.map((r) => r.age)),
+    minKm: Math.min(...rows.map((r) => r.km)),
+    maxKm: Math.max(...rows.map((r) => r.km)),
   };
   if (useKw) {
     model.coefKw = coef[kwIdx]!;
@@ -217,7 +234,12 @@ export function expectedPrice(
   km: number,
   attrs?: FitAttrs,
 ): number {
-  let p = m.intercept + m.coefAge * age + m.coefKm * km;
+  // Never extrapolate: log-price predictions outside the training range decay
+  // toward zero (age 30 / 600k km once produced e^-232). Value the row at the
+  // nearest observed boundary instead.
+  const a = Math.min(Math.max(age, m.minAge), m.maxAge);
+  const k = Math.min(Math.max(km, m.minKm), m.maxKm);
+  let p = m.intercept + m.coefAge * a + m.coefKm * k;
   if (m.coefKw !== undefined) {
     // Missing kW → fit-sample mean (unbiased in expectation). kw=0 would
     // understate rows the fit never saw (see PriceModel.meanKw).
@@ -233,7 +255,27 @@ export function expectedPrice(
   if (m.coefAuto !== undefined && attrs?.auto === true) {
     p += m.coefAuto;
   }
-  return p;
+  return Math.exp(p);
+}
+
+/**
+ * Final safety net: keep a fitted expectation inside the group's observed
+ * price range (IQR-trimmed, so a €100 part-out cannot become the floor).
+ * The log fit already prevents negative prices; this stops a pathological
+ * in-sample fit from inventing a price the market never showed.
+ */
+export function clampExpected(value: number, prices: number[]): number {
+  if (prices.length === 0) return value;
+  const { kept } = iqrTrimmed(prices);
+  const band = kept.length > 0 ? kept : prices;
+  return Math.min(Math.max(value, Math.min(...band)), Math.max(...band));
+}
+
+/** Hard ceiling on a single listing's deviation (a bad fit cannot score -3681%). */
+export const MAX_DEVIATION_PCT = 50;
+
+export function capDeviation(dev: number): number {
+  return Math.max(-MAX_DEVIATION_PCT, Math.min(MAX_DEVIATION_PCT, dev));
 }
 
 /** Positive when the asking price is cheaper than expected (a deal). */
