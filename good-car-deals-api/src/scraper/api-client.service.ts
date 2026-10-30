@@ -20,6 +20,8 @@ interface SearchResult {
   price?: number | null;
   city?: string;
   status?: string;
+  brand?: string;
+  model?: string;
 }
 
 interface SearchPayload {
@@ -31,6 +33,7 @@ interface SearchPayload {
   };
 }
 
+const SITE = 'https://www.polovniautomobili.com';
 const CORE_API = 'https://core.polovniautomobili.com/api/v1';
 
 @Injectable()
@@ -132,6 +135,8 @@ export class ApiClientService {
     if (!url.searchParams.has('showOldNew')) {
       url.searchParams.set('showOldNew', 'old');
     }
+    // No brand/model filter: the feed is scraped site-wide. Brand and model
+    // are read per listing instead (see toRawListing).
 
     // The site addresses array params as model[0], model[1], …
     const params = new URLSearchParams();
@@ -179,7 +184,9 @@ export class ApiClientService {
   private toRawListing(result: SearchResult): RawListingData {
     return {
       title: result.title ?? '',
-      listingUrl: `https://www.polovniautomobili.com/auto-oglasi/${result.id}`,
+      brand: result.brand ?? '',
+      model: result.model ?? '',
+      listingUrl: `${SITE}/auto-oglasi/${result.id}/${this.slugify(result.title ?? '')}`,
       price: this.formatPrice(result.price),
       priceNote: '',
       year: result.year ? String(result.year) : '',
@@ -190,6 +197,26 @@ export class ApiClientService {
       transmission: result.gearBox ?? '',
       location: result.city ?? '',
     };
+  }
+
+  /**
+   * Ad URLs are "/auto-oglasi/<id>/<slug>"; the slug is cosmetic (the id
+   * resolves the ad, the site canonicalises any slug) but a URL without one
+   * renders the search page instead of the ad.
+   * "Opel Astra 1.6 S.S" → "opel-astra-16-ss"
+   */
+  private slugify(title: string): string {
+    const slug = title
+      .toLowerCase()
+      // đ has no NFD decomposition, unlike č/ć/š/ž
+      .replace(/đ/g, 'd')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\./g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    return slug || 'oglas';
   }
 
   /** "6250" → "6.250 €" (site display format). */

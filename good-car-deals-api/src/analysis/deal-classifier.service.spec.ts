@@ -3,6 +3,9 @@ import { HttpService } from '../scraper/http.service';
 import { HtmlParserService } from '../scraper/html-parser.service';
 import { AppModule } from '../app.module';
 
+const SEARCH_URL =
+  'https://www.polovniautomobili.com/auto-oglasi/pretraga?sort=basic&onlyWithPrice=true';
+
 describe('Real Flow E2E Test - Scrape → Parse', () => {
   let httpService: HttpService;
   let htmlParserService: HtmlParserService;
@@ -19,7 +22,7 @@ describe('Real Flow E2E Test - Scrape → Parse', () => {
   describe('Real E2E Flow', () => {
     it('should scrape and parse real data from website (LIVE HTTP)', async () => {
       // Step 1: Fetch real HTML from website
-      const url = httpService.buildSearchUrl(1);
+      const url = SEARCH_URL;
       console.log(`\n  Fetching: ${url.substring(0, 60)}...`);
 
       const html = await httpService.fetchPage(url);
@@ -41,7 +44,7 @@ describe('Real Flow E2E Test - Scrape → Parse', () => {
 
     it('should normalize scraped data correctly', async () => {
       // Get a real page
-      const html = await httpService.fetchPage(httpService.buildSearchUrl(1));
+      const html = await httpService.fetchPage(SEARCH_URL);
       const listings = htmlParserService.parsePage(html);
 
       // Test normalization on real data

@@ -3,8 +3,9 @@ export interface AppConfig {
   scraper: {
     targetUrl: string;
     cronSchedule: string;
-    brand: string;
-    model: string;
+    /** Unused since the scrape went site-wide. */
+    brand?: string;
+    model?: string;
     proxyUrl?: string;
   };
   willhaben: {

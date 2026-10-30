@@ -1,12 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
 import { ScraperService } from './scraper.service';
 import { ApiClientService, SearchPage } from './api-client.service';
 import { HtmlParserService, RawListingData } from './html-parser.service';
 import { PrismaService } from '../prisma/prisma.service';
 
+type UpsertArgs = {
+  where: { listingUrl: string };
+  update: Record<string, unknown>;
+  create: Record<string, unknown>;
+};
+
 const rawListing = (listingUrl: string): RawListingData => ({
   title: 'Opel Astra J',
+  brand: 'Opel',
+  model: 'Astra',
   listingUrl,
   price: '5.550 €',
   priceNote: '',
@@ -23,7 +30,7 @@ describe('ScraperService', () => {
   let scraperService: ScraperService;
   const fetchSearchPage = jest.fn<Promise<SearchPage>, [number]>();
   const isListingActive = jest.fn<Promise<boolean>, [string]>();
-  const upsert = jest.fn();
+  const upsert = jest.fn<Promise<unknown>, [UpsertArgs]>();
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -46,15 +53,6 @@ describe('ScraperService', () => {
           provide: PrismaService,
           useValue: {
             listing: { upsert },
-          },
-        },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: (key: string) => {
-              if (key === 'scraper.model') return 'Astra J';
-              return undefined;
-            },
           },
         },
       ],
@@ -114,6 +112,14 @@ describe('ScraperService', () => {
 
       expect(saved).toHaveLength(1);
       expect(upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it('stores a brand-scoped model label', async () => {
+      await scraperService.saveListings([
+        rawListing('https://example.com/auto-oglasi/1/live-car'),
+      ]);
+
+      expect(upsert.mock.calls[0][0].create.model).toBe('Opel Astra');
     });
 
     it('does not save an expired listing', async () => {

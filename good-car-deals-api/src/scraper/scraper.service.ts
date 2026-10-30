@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { ApiClientService } from './api-client.service';
 import { HtmlParserService, RawListingData } from './html-parser.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -9,19 +8,19 @@ import { Listing } from '@prisma/client';
 @Injectable()
 export class ScraperService {
   private readonly logger = new Logger(ScraperService.name);
-  private readonly maxPages = 15;
+  /** Safety cap only — pagination stops at the pageCount the API reports. */
+  private readonly maxPages = 100;
 
   constructor(
     private apiClientService: ApiClientService,
     private htmlParserService: HtmlParserService,
     private prismaService: PrismaService,
-    private configService: ConfigService,
   ) {}
 
   /**
-   * Scrape all target model listings (up to maxPages).
+   * Scrape the site-wide search feed (up to maxPages).
    * Pages come from the site's JSON search feed; pagination stops at the
-   * last page the API reports.
+   * last page the API reports or at the safety cap.
    * @returns Array of raw listing data (deduplicated by listingUrl)
    */
   async scrapeTargetModel(): Promise<RawListingData[]> {
@@ -29,9 +28,8 @@ export class ScraperService {
     let pageCount = 1;
     let successCount = 0;
     let failCount = 0;
-    const model = this.configService.get<string>('scraper.model')!;
 
-    this.logger.log(`Starting scrape of ${model} listings...`);
+    this.logger.log('Starting scrape (all brands)...');
 
     for (let page = 1; page <= Math.min(pageCount, this.maxPages); page++) {
       try {
@@ -76,7 +74,6 @@ export class ScraperService {
   async saveListings(listings: RawListingData[]): Promise<Listing[]> {
     const savedListings: Listing[] = [];
     const currentYear = new Date().getFullYear();
-    const model = this.configService.get<string>('scraper.model')!;
 
     this.logger.log(`Saving ${listings.length} listings to database...`);
     let expiredCount = 0;
@@ -111,6 +108,8 @@ export class ScraperService {
             age = currentYear - yearNum;
           }
         }
+
+        const model = this.modelLabel(raw);
 
         // Upsert listing
         const listing = await this.prismaService.listing.upsert({
@@ -163,6 +162,18 @@ export class ScraperService {
     }
     this.logger.log(`Saved ${savedListings.length} listings to database`);
     return savedListings;
+  }
+
+  /**
+   * Brand-scoped model label ("Opel Astra") so deal comps never mix brands.
+   */
+  private modelLabel(raw: RawListingData): string | null {
+    const label = [raw.brand, raw.model]
+      .map((part) => part?.trim())
+      .filter(Boolean)
+      .join(' ');
+
+    return label || null;
   }
 
   /**

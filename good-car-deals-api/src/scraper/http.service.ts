@@ -12,9 +12,6 @@ export class HttpError extends Error {
 
 @Injectable()
 export class HttpService {
-  private readonly baseUrl: string;
-  private readonly brand: string;
-  private readonly model: string;
   private readonly timeout = 10000;
   private readonly maxRetries = 3;
   private readonly headers = {
@@ -27,10 +24,6 @@ export class HttpService {
   private readonly impit: Impit;
 
   constructor(private configService: ConfigService) {
-    this.baseUrl = this.configService.get<string>('scraper.targetUrl')!;
-    this.brand = this.configService.get<string>('scraper.brand')!;
-    this.model = this.configService.get<string>('scraper.model')!;
-
     const opts: Record<string, unknown> = {
       browser: 'firefox',
       timeout: this.timeout,
@@ -136,26 +129,6 @@ export class HttpService {
     } catch {
       return true; // Cannot verify — assume live.
     }
-  }
-
-  /**
-   * Build search URL with brand/model.
-   * Mirrors the site's canonical link format exactly
-   * (e.g. ?brand=Opel&model[]=Astra+J&page=2&sort=basic):
-   * lowercase/hyphenated slugs return page 1 content for every
-   * page number, so case and spacing must be preserved.
-   * @param page - Page number (1-based)
-   * @returns The constructed URL
-   */
-  buildSearchUrl(page: number): string {
-    const separator = this.baseUrl.includes('?') ? '&' : '?';
-    // Preserve model spacing as "+" (site canonical form, not hyphenated)
-    const modelParam = this.model.trim().replace(/\s+/g, '+');
-    // Capitalize brand ("opel" → "Opel"), keep the rest untouched
-    // so already-correct values ("BMW") survive
-    const brandParam = this.brand.charAt(0).toUpperCase() + this.brand.slice(1);
-
-    return `${this.baseUrl}${separator}brand=${brandParam}&model[]=${modelParam}&page=${page}&sort=basic&damaged[]=notDamaged&onlyWithPrice=true&showOldNew=old`;
   }
 
   /**

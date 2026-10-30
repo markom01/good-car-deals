@@ -191,11 +191,19 @@ Branch `feat/json-api-scraper`:
 - `good-car-deals-api/src/scraper/http.service.ts` — `fetchJson<T>()` and `HttpError`
   (same impit transport, retries and proxy as `fetchPage`).
 - `good-car-deals-api/src/scraper/scraper.service.ts` — paginates the JSON feed
-  (`1..min(pageCount, 15)`), dedupes by id-based URL, liveness through the detail API.
+  (`1..min(pageCount, 100)`), dedupes by URL, liveness through the detail API.
+- No brand/model filter: the feed is scraped whole-site (`SCRAPER_BRAND` /
+  `SCRAPER_MODEL` are unused). Each result's `brand` + `model` is stored as a
+  brand-scoped label (`"Opel Astra"`) so per-model comps never mix brands.
+- Listing URLs are `/auto-oglasi/<id>/<slug>` — the slug is generated from the
+  title and is cosmetic (the site canonicalises any slug), but an **id-only URL
+  renders the search page**, so the slug is required for working links.
 - HTML parser kept as legacy fallback; it is no longer on the scrape path.
 
-Live verification (2026-10-29): 15 pages → 375 unique listings, 0 missing year,
-0 missing price, 0 missing mileage; `isListingActive` true for a live id, false for id 1.
+Live verification (2026-10-30): 100 pages → 2497 unique listings saved, 0 missing
+year, 0 missing price, 0 missing mileage; all 2497 URLs slug-based (0 id-only);
+sampled links across 5 brands resolve to the matching canonical ad page.
+Whole feed reports 2792 pages / ~69.8k ads, so the 100-page cap is a slice.
 
 ## Not needed: REA
 

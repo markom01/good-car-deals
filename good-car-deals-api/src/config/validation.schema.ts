@@ -11,13 +11,14 @@ export class EnvironmentVariables {
   @IsNotEmpty()
   SCRAPER_TARGET_URL!: string;
 
+  /** Unused since the scrape went site-wide; kept for old deployments. */
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  SCRAPER_BRAND!: string;
+  SCRAPER_BRAND?: string;
 
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  SCRAPER_MODEL!: string;
+  SCRAPER_MODEL?: string;
 
   @IsString()
   @IsNotEmpty()

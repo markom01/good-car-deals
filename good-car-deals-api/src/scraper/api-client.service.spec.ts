@@ -18,6 +18,8 @@ const searchPayload = (overrides: Record<string, unknown> = {}) => ({
         {
           id: '30120777',
           title: 'Opel Astra K 1.6 CDTi S.S . SPORT',
+          brand: 'Opel',
+          model: 'Astra',
           year: 2018,
           mileage: 167707,
           fuel: 'Dizel',
@@ -49,7 +51,7 @@ describe('ApiClientService', () => {
           useValue: {
             get: (key: string) =>
               key === 'scraper.targetUrl'
-                ? 'https://www.polovniautomobili.com/auto-oglasi/pretraga?brand=Opel&model[]=Astra'
+                ? 'https://www.polovniautomobili.com/auto-oglasi/pretraga'
                 : undefined,
           },
         },
@@ -73,7 +75,10 @@ describe('ApiClientService', () => {
     expect(page.listings).toHaveLength(1);
     expect(page.listings[0]).toEqual({
       title: 'Opel Astra K 1.6 CDTi S.S . SPORT',
-      listingUrl: 'https://www.polovniautomobili.com/auto-oglasi/30120777',
+      brand: 'Opel',
+      model: 'Astra',
+      listingUrl:
+        'https://www.polovniautomobili.com/auto-oglasi/30120777/opel-astra-k-16-cdti-ss-sport',
       price: '6.250 €',
       priceNote: '',
       year: '2018',
@@ -86,6 +91,28 @@ describe('ApiClientService', () => {
     });
   });
 
+  it('turns diacritics and punctuation into a url-safe slug', async () => {
+    fetchJson.mockResolvedValue(
+      searchPayload({ title: 'Škoda Octavia 1.9 TDI, 2008. godište — Đakovo' }),
+    );
+
+    const page = await service.fetchSearchPage(1);
+
+    expect(page.listings[0].listingUrl).toBe(
+      'https://www.polovniautomobili.com/auto-oglasi/30120777/skoda-octavia-19-tdi-2008-godiste-dakovo',
+    );
+  });
+
+  it('falls back to a placeholder slug when the title is empty', async () => {
+    fetchJson.mockResolvedValue(searchPayload({ title: '' }));
+
+    const page = await service.fetchSearchPage(1);
+
+    expect(page.listings[0].listingUrl).toBe(
+      'https://www.polovniautomobili.com/auto-oglasi/30120777/oglas',
+    );
+  });
+
   it('drops ads that are not active', async () => {
     fetchJson.mockResolvedValue(searchPayload({ status: 'expired' }));
 
@@ -94,7 +121,7 @@ describe('ApiClientService', () => {
     expect(page.listings).toHaveLength(0);
   });
 
-  it('requests the build-scoped JSON page with brand, model, page and default sort', async () => {
+  it('builds a whole-site url without brand or model filters', async () => {
     fetchJson.mockResolvedValue(searchPayload());
 
     await service.fetchSearchPage(2);
@@ -103,8 +130,8 @@ describe('ApiClientService', () => {
     expect(url).toContain(
       '/_next/data/build-TEST123/auto-oglasi/pretraga.json?',
     );
-    expect(url).toContain('brand=Opel');
-    expect(url).toContain('model%5B0%5D=Astra');
+    expect(url).not.toContain('brand=');
+    expect(url).not.toContain('model');
     expect(url).toContain('page=2');
     expect(url).toContain('sort=basic');
     expect(url).toContain('onlyWithPrice=true');

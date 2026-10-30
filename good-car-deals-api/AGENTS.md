@@ -37,7 +37,7 @@ src/
 
 1. **HttpService** — `impit` with Chrome TLS fingerprint. 3 retries with exponential backoff. Retries on timeout, 403, 503, network errors. `fetchPage` returns HTML, `fetchJson` returns parsed JSON; non-2xx throws `HttpError` with `status`. Supports optional `SCRAPER_PROXY_URL` for residential proxy.
 2. **ApiClientService** — primary data source. `fetchSearchPage(page)` calls the site's Next.js data endpoint `/_next/data/<buildId>/auto-oglasi/pretraga.json` (buildId read from `__NEXT_DATA__`, refreshed once on 404) and maps JSON results into `RawListingData`. `isListingActive(adId)` checks `core.polovniautomobili.com/api/v1/classifieds/car/{id}` (`status === 'active'`, 404 → expired, other errors → assume live).
-3. **ScraperService** — Loops pages `1..min(pageCount, 15)` with 1s delay between requests. Deduplicates by `listingUrl` (`https://www.polovniautomobili.com/auto-oglasi/<id>` — id-based, so title edits don't create duplicates). Upserts into DB. 1 page failure doesn't stop the rest.
+3. **ScraperService** — Loops pages `1..min(pageCount, 100)` with 1s delay between requests (site-wide feed: ~2792 pages / ~69.8k ads; the 100-page cap = ~2.5k listings per run). Deduplicates by `listingUrl` (`/auto-oglasi/<id>/<slug>`; the slug is generated from the title and canonicalised by the site — a URL without a slug renders the search page). Stores the feed's `brand` + `model` as a brand-scoped label ("Opel Astra") so comps never mix brands. 1 page failure doesn't stop the rest.
 4. **HtmlParserService** — legacy DOM parser, kept as reference/fallback only. Production scraping no longer calls `parsePage`; only `normalizePrice`/`normalizeMileage` are used.
 5. **CronService** — `@Cron(CronExpression.EVERY_WEEK)`. Orchestrates scrape → save → classify. Errors don't crash the app, existing DB data preserved.
 6. **Startup** — With `SKIP_STARTUP_SCRAPE=true`, skips scraping (Render gets 403). With `--scrape` flag, runs scrape-only mode and exits.
@@ -60,7 +60,7 @@ v2 comps-relative scoring in `deal-classifier.service.ts` + pure math in `src/an
 | `app.module.ts`                   | Root module, imports ConfigModule.forRoot (with validate), ScheduleModule.forRoot, ThrottlerModule, Prisma, Scraper, Analysis, Deals; registers global ThrottlerGuard |
 | `main.ts`                         | `BigInt.prototype.toJSON`, `helmet()`, CORS with optional `CORS_ORIGIN` allowlist, `--scrape` CLI flag, `SKIP_STARTUP_SCRAPE` env var                                 |
 | `cron.service.ts`                 | `@Cron(CronExpression.EVERY_WEEK)` — entry point for full pipeline                                                                                                    |
-| `src/config/validation.schema.ts` | 5 required env vars (DATABASE_URL, SCRAPER_TARGET_URL, SCRAPER_BRAND, SCRAPER_MODEL, SCRAPER_CRON_SCHEDULE) + optional SCRAPER_PROXY_URL, CORS_ORIGIN                 |
+| `src/config/validation.schema.ts` | 3 required env vars (DATABASE_URL, SCRAPER_TARGET_URL, SCRAPER_CRON_SCHEDULE) + optional SCRAPER_BRAND/SCRAPER_MODEL (unused), SCRAPER_PROXY_URL, CORS_ORIGIN |
 | `prisma/schema.prisma`            | Single `Listing` model — BigInt id, snake_case via `@map()`, table `listings`, indexes on dealScore/dealType/model/scrapedAt                                          |
 
 ## TESTS
