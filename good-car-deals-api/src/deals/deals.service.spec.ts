@@ -241,8 +241,9 @@ describe('DealsService.getDeals (v2 gate + pooled average)', () => {
     const zafira = result.find((r) => r.id === 5)!;
     expect(zafira.expectedPrice).toBe(6000);
     expect(zafira.transmission).toBeNull();
-    // Pool of 1 (< 3 rows) → null average, null pct
-    expect(zafira.modelAvgPriceNumeric).toBeNull();
-    expect(zafira.priceToModelAvgPct).toBeNull();
+    // Model window of 1 (< 3 rows) → falls back to the row's own expected
+    // price, so the card still renders the comparison (0%).
+    expect(zafira.modelAvgPriceNumeric).toBe(6000);
+    expect(zafira.priceToModelAvgPct).toBe(0);
   });
 });
