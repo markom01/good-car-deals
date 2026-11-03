@@ -145,7 +145,8 @@ function scoreRow(id: number, expected: number, price: number): ClassifyResult {
   // with the market percentile across ALL rated rows before returning.
   return {
     id,
-    dealType: classifyTier(dev),
+    // Euro saving = the same percentage of the benchmark (positive = cheaper).
+    dealType: classifyTier(dev, (dev / 100) * expected),
     dealScore: 0,
     expectedPrice: expected,
     deviationPct: dev,
