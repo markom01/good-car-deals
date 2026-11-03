@@ -125,20 +125,20 @@ describe('classifyGroups (generation-only)', () => {
     }
   });
 
-  it('absolute rubric (50 + dev*4), not a market percentile', () => {
+  it('absolute rubric (50 + dev), not a market percentile', () => {
     // All ten rows sit at 150_000 km, so the mileage slope is unusable and
     // the benchmark is the trimmed median price, 8_000 for every row.
     const flat = Array.from({ length: 8 }, (_, i) =>
       genRow(40 + i, 2012, 150_000, 8_000),
     );
-    const cheap = genRow(200, 2012, 150_000, 6_800); // dev +15%
-    const dear = genRow(201, 2012, 150_000, 9_000); // dev -12.5%
+    const cheap = genRow(200, 2012, 150_000, 6_800); // dev +15% → score 65
+    const dear = genRow(201, 2012, 150_000, 9_000); // dev -12.5% → score 38
     const out = classifyGroups([...flat, cheap, dear]);
 
     expect(out.find((r) => r.id === 200)!.deviationPct).toBeCloseTo(15, 5);
-    expect(out.find((r) => r.id === 200)!.dealScore).toBe(100);
+    expect(out.find((r) => r.id === 200)!.dealScore).toBe(65);
     expect(out.find((r) => r.id === 201)!.deviationPct).toBeCloseTo(-12.5, 5);
-    expect(out.find((r) => r.id === 201)!.dealScore).toBe(0);
+    expect(out.find((r) => r.id === 201)!.dealScore).toBe(38);
     // Absolute score: every at-benchmark row is exactly 50. A percentile
     // pass would spread these identical rows across 0..100 instead.
     for (const r of flat) {
@@ -176,7 +176,7 @@ describe('classifyGroups (generation-only)', () => {
     const r = out.find((x) => x.id === 400)!;
     expect(r.deviationPct).toBeCloseTo(8, 5);
     expect(r.dealType).toBe('GOOD DEAL');
-    expect(r.dealScore).toBe(82);
+    expect(r.dealScore).toBe(58);
   });
 
   it('price-null / km-null / year-null rows inside a healthy group → UNRATED', () => {

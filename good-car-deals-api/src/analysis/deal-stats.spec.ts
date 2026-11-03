@@ -10,10 +10,12 @@ import {
 
 describe('deviation → score and tier', () => {
   it.each([
-    [10, 90],
+    [10, 60],
     [0, 50],
-    [-12.5, 0],
-    [40, 100],
+    [-12.5, 38],
+    [40, 90],
+    [50, 100], // upper clamp
+    [-50, 0], // lower clamp
   ])('dev %s → score %s', (dev, score) =>
     expect(dealScoreFromDeviation(dev)).toBe(score),
   );

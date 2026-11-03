@@ -26,9 +26,9 @@ export function deviationPct(expected: number, price: number): number {
   return ((expected - price) / expected) * 100;
 }
 
-/** 50 + dev*4 clamped to [0,100] and rounded. Positive dev → better score. */
+/** 50 + dev clamped to [0,100] and rounded. Positive dev → better score. */
 export function dealScoreFromDeviation(dev: number): number {
-  return Math.max(0, Math.min(100, Math.round(50 + dev * 4)));
+  return Math.max(0, Math.min(100, Math.round(50 + dev)));
 }
 
 /**
