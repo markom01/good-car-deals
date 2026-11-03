@@ -48,6 +48,11 @@ export class EnvironmentVariables {
   @IsString()
   VAPID_EMAIL?: string;
 
+  /** Enable willhaben watcher polling (optional — defaults false). */
+  @IsOptional()
+  @IsString()
+  WILLHABEN_ENABLED?: string;
+
   /** Enable push delivery (optional — defaults false). */
   @IsOptional()
   @IsString()

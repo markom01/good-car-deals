@@ -10,6 +10,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import type { Listing } from '@good-car-deals/shared';
+import { estimateSerbiaImportCostsEur } from '@good-car-deals/shared';
 
 function formatNumber(n: number | null): string {
   if (n === null || n === undefined) return 'N/A';
@@ -25,6 +26,11 @@ export function DealCard({ deal }: { deal: Listing }) {
   ]
     .filter(Boolean)
     .join(' · ');
+
+  const est =
+    deal.plateOrigin === 'foreign' && deal.priceNumeric != null
+      ? estimateSerbiaImportCostsEur(deal.priceNumeric)
+      : null;
 
   return (
     <Card className="min-w-[320px] max-w-md w-full">
@@ -47,24 +53,42 @@ export function DealCard({ deal }: { deal: Listing }) {
           </span>
         </div>
 
-        {deal.priceToModelAvgPct !== null &&
-          deal.modelAvgPriceNumeric !== null && (
+        {deal.plateOrigin === 'foreign' && (
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">Foreign plates</Badge>
+            <span className="text-muted-foreground text-xs">
+              import duty and registration not included
+            </span>
+          </div>
+        )}
+        {deal.plateOrigin === 'foreign' && deal.priceNumeric != null && (
+          <div className="flex items-baseline justify-between text-xs text-muted-foreground">
+            <span>+ import &amp; registration (est.)</span>
+            <span className="tabular-nums">
+              +€{formatNumber(est!.totalAddedEur)} ≈ €{' '}
+              {formatNumber(est!.totalRealisticEur)} total
+            </span>
+          </div>
+        )}
+
+        {deal.priceToGenerationAvgPct !== null &&
+          deal.generationMedianPriceNumeric !== null && (
             <div className="flex items-center gap-2">
               <Badge
                 variant={
-                  deal.priceToModelAvgPct < 0
+                  deal.priceToGenerationAvgPct < 0
                     ? 'default'
-                    : deal.priceToModelAvgPct > 0
+                    : deal.priceToGenerationAvgPct > 0
                       ? 'destructive'
                       : 'ghost'
                 }
               >
-                {deal.priceToModelAvgPct > 0 ? '+' : ''}
-                {Math.round(deal.priceToModelAvgPct)}%
+                {deal.priceToGenerationAvgPct > 0 ? '+' : ''}
+                {Math.round(deal.priceToGenerationAvgPct)}%
               </Badge>
               <span className="text-muted-foreground text-xs">
-                compared to model average of €
-                {formatNumber(deal.modelAvgPriceNumeric)}
+                compared to generation median of €{' '}
+                {formatNumber(deal.generationMedianPriceNumeric)}
               </span>
             </div>
           )}

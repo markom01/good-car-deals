@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ScraperService } from './scraper.service';
-import { ApiClientService, SearchPage } from './api-client.service';
-import { HtmlParserService, RawListingData } from './html-parser.service';
+import { ApiClientService } from './api-client.service';
+import { SearchPage, RawListingData } from './types';
 import { PrismaService } from '../prisma/prisma.service';
 
 type UpsertArgs = {
@@ -29,8 +29,11 @@ const rawListing = (listingUrl: string): RawListingData => ({
 describe('ScraperService', () => {
   let scraperService: ScraperService;
   const fetchSearchPage = jest.fn<Promise<SearchPage>, [number]>();
-  const isListingActive = jest.fn<Promise<boolean>, [string]>();
   const upsert = jest.fn<Promise<unknown>, [UpsertArgs]>();
+  const deleteMany = jest.fn<Promise<{ count: number }>, [unknown]>();
+  const progressFindUnique = jest.fn<Promise<unknown>, [unknown]>();
+  const progressUpsert = jest.fn<Promise<unknown>, [unknown]>();
+  const progressUpdate = jest.fn<Promise<unknown>, [unknown]>();
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -38,21 +41,17 @@ describe('ScraperService', () => {
         ScraperService,
         {
           provide: ApiClientService,
-          useValue: { fetchSearchPage, isListingActive },
-        },
-        {
-          provide: HtmlParserService,
-          useValue: {
-            normalizeMileage: jest.fn().mockReturnValue(150000),
-            normalizePrice: jest
-              .fn()
-              .mockReturnValue({ raw: '5.550 €', numeric: 5550 }),
-          },
+          useValue: { fetchSearchPage },
         },
         {
           provide: PrismaService,
           useValue: {
-            listing: { upsert },
+            listing: { upsert, deleteMany },
+            scrapeProgress: {
+              findUnique: progressFindUnique,
+              upsert: progressUpsert,
+              update: progressUpdate,
+            },
           },
         },
       ],
@@ -63,7 +62,53 @@ describe('ScraperService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    isListingActive.mockResolvedValue(true);
+    deleteMany.mockResolvedValue({ count: 0 });
+    progressUpsert.mockResolvedValue({});
+    progressUpdate.mockResolvedValue({});
+  });
+
+  describe('scrapeAndSaveResumable', () => {
+    it('resumes from the page after the saved checkpoint', async () => {
+      progressFindUnique.mockResolvedValue({
+        key: 'default',
+        targetUrl: process.env.SCRAPER_TARGET_URL ?? '',
+        lastPage: 3,
+        pageCount: 4,
+        status: 'running',
+        startedAt: new Date(),
+      });
+      fetchSearchPage.mockResolvedValue({
+        pageCount: 4,
+        listings: [rawListing('https://example.com/auto-oglasi/4/d')],
+      });
+
+      const result = await scraperService.scrapeAndSaveResumable();
+
+      expect(result.resumedFrom).toBe(4);
+      expect(fetchSearchPage).toHaveBeenCalledTimes(1);
+      expect(fetchSearchPage).toHaveBeenCalledWith(4);
+      expect(upsert).toHaveBeenCalledTimes(1);
+    });
+
+    it('starts at page 1 when the previous run finished', async () => {
+      progressFindUnique.mockResolvedValue({
+        key: 'default',
+        targetUrl: process.env.SCRAPER_TARGET_URL ?? '',
+        lastPage: 9,
+        pageCount: 9,
+        status: 'done',
+        startedAt: new Date(),
+      });
+      fetchSearchPage.mockResolvedValue({
+        pageCount: 1,
+        listings: [rawListing('https://example.com/auto-oglasi/1/a')],
+      });
+
+      const result = await scraperService.scrapeAndSaveResumable();
+
+      expect(result.resumedFrom).toBe(1);
+      expect(fetchSearchPage).toHaveBeenCalledWith(1);
+    });
   });
 
   describe('scrapeTargetModel', () => {
@@ -104,14 +149,15 @@ describe('ScraperService', () => {
     });
   });
 
-  describe('saveListings - expired listing filtering', () => {
-    it('saves a live listing', async () => {
-      const live = 'https://example.com/auto-oglasi/1/live-car';
+  describe('saveListings', () => {
+    it('saves every listing from the feed without a detail-API call', async () => {
+      const saved = await scraperService.saveListings([
+        rawListing('https://example.com/auto-oglasi/1/a'),
+        rawListing('https://example.com/auto-oglasi/2/b'),
+      ]);
 
-      const saved = await scraperService.saveListings([rawListing(live)]);
-
-      expect(saved).toHaveLength(1);
-      expect(upsert).toHaveBeenCalledTimes(1);
+      expect(saved).toHaveLength(2);
+      expect(upsert).toHaveBeenCalledTimes(2);
     });
 
     it('stores a brand-scoped model label', async () => {
@@ -122,30 +168,70 @@ describe('ScraperService', () => {
       expect(upsert.mock.calls[0][0].create.model).toBe('Opel Astra');
     });
 
-    it('does not save an expired listing', async () => {
-      const expired = 'https://example.com/auto-oglasi/2/expired-car';
-      isListingActive.mockResolvedValue(false);
-
-      const saved = await scraperService.saveListings([rawListing(expired)]);
-
-      expect(saved).toHaveLength(0);
-      expect(upsert).not.toHaveBeenCalled();
-    });
-
-    it('filters expired from a mixed batch and saves only live ones', async () => {
-      const live = 'https://example.com/auto-oglasi/3/live-car';
-      const expired = 'https://example.com/auto-oglasi/4/expired-car';
-      isListingActive.mockImplementation((id: string) =>
-        Promise.resolve(id === '3'),
-      );
-
-      const saved = await scraperService.saveListings([
-        rawListing(expired),
-        rawListing(live),
+    it('stores the plate origin derived from feed tags', async () => {
+      await scraperService.saveListings([
+        {
+          ...rawListing('https://example.com/auto-oglasi/5/domestic'),
+          plateOrigin: 'domestic',
+        },
       ]);
 
-      expect(saved).toHaveLength(1);
-      expect(upsert).toHaveBeenCalledTimes(1);
+      expect(upsert.mock.calls[0][0].create.plateOrigin).toBe('domestic');
+      expect(upsert.mock.calls[0][0].update.plateOrigin).toBe('domestic');
+    });
+
+    it('skips foreign-plate listings (never reaches the DB)', async () => {
+      await scraperService.saveListings([
+        {
+          ...rawListing('https://example.com/auto-oglasi/6/import'),
+          plateOrigin: 'foreign',
+        },
+      ]);
+
+      expect(upsert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('deep-pagination guard', () => {
+    it('stops when the feed repeats a page instead of saving duplicates', async () => {
+      const repeated = [
+        rawListing('https://example.com/auto-oglasi/1/a'),
+        rawListing('https://example.com/auto-oglasi/2/b'),
+      ];
+      progressFindUnique.mockResolvedValue(null);
+      fetchSearchPage.mockResolvedValue({
+        pageCount: 5000,
+        listings: repeated,
+      });
+
+      const result = await scraperService.scrapeAndSaveResumable();
+
+      expect(result.capped).toBe(true);
+      expect(fetchSearchPage).toHaveBeenCalledTimes(2); // page 1 saved, page 2 repeated
+      expect(upsert).toHaveBeenCalledTimes(2);
+      expect(progressUpdate).toHaveBeenCalledWith({
+        where: { key: 'default' },
+        data: { status: 'capped' },
+      });
+    });
+
+    it('keeps going when each page brings new listings', async () => {
+      progressFindUnique.mockResolvedValue(null);
+      fetchSearchPage.mockImplementation((page: number) =>
+        Promise.resolve({
+          pageCount: 3,
+          listings: [
+            rawListing(`https://example.com/auto-oglasi/${page}/a`),
+            rawListing(`https://example.com/auto-oglasi/${page}/b`),
+          ],
+        }),
+      );
+
+      const result = await scraperService.scrapeAndSaveResumable();
+
+      expect(result.capped).toBe(false);
+      expect(fetchSearchPage).toHaveBeenCalledTimes(3);
+      expect(upsert).toHaveBeenCalledTimes(6);
     });
   });
 });

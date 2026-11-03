@@ -162,7 +162,8 @@ export default function WheelRankPage() {
               <CardContent>
                 <p className="mb-4 text-muted-foreground">
                   WheelRank assigns every listing a Deal Score (0–100) using two
-                  methods: price-per-year ranking and model average comparison.
+                  methods: price-per-year ranking and generation median
+                  comparison.
                 </p>
                 <ul className="flex flex-col gap-3 text-sm">
                   <li className="flex items-center gap-2">

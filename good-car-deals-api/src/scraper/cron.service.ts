@@ -30,21 +30,29 @@ export class CronService {
     const startTime = Date.now();
 
     try {
-      // Step 1: Scrape all pages
-      const listings = await this.scraperService.scrapeTargetModel();
-      this.logger.log(`Scraped ${listings.length} unique listings`);
+      // Step 1 + 2: Scrape pages and save each page as it arrives.
+      // Resumes from the last saved page if a previous run was interrupted.
+      const result = await this.scraperService.scrapeAndSaveResumable();
+      this.logger.log(
+        `Scrape segment done. Resumed from page ${result.resumedFrom}, ` +
+          `saved ${result.saved} listings from ${result.pages} pages ` +
+          `(${result.failed} failed).`,
+      );
 
-      if (listings.length === 0) {
+      if (result.capped) {
+        this.logger.error(
+          'Scrape hit the feed deep-pagination cap and stopped early. ' +
+            'Raise the page size or partition the query before the next run.',
+        );
+      }
+
+      if (result.saved === 0) {
         this.logger.warn(
-          'Scrape returned 0 listings. Website may be unreachable or changed. ' +
+          'Scrape saved 0 listings. Website may be unreachable or changed. ' +
             'Existing DB data preserved.',
         );
         return;
       }
-
-      // Step 2: Save to database
-      const saved = await this.scraperService.saveListings(listings);
-      this.logger.log(`Saved ${saved.length} listings to database`);
 
       // Step 3: Classify deals
       const classified = await this.dealClassifierService.classifyDeals();
@@ -52,9 +60,8 @@ export class CronService {
 
       const duration = ((Date.now() - startTime) / 1000).toFixed(1);
       this.logger.log(
-        `Weekly scrape complete. Scraped: ${listings.length}, ` +
-          `Saved: ${saved.length}, Classified: ${classified}. ` +
-          `Duration: ${duration}s`,
+        `Weekly scrape complete. Saved: ${result.saved}, ` +
+          `Classified: ${classified}. Duration: ${duration}s`,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';

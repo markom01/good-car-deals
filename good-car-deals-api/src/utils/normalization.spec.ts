@@ -4,6 +4,8 @@ import {
   extractModel,
   parseEngineCc,
   parsePowerKw,
+  plateOriginFromTags,
+  normalizePlateOrigin,
 } from './normalization';
 
 // Test data (no external dependencies)
@@ -106,5 +108,30 @@ describe('extractModel', () => {
 
   it('should handle single word titles', () => {
     expect(extractModel('BMW')).toBeNull();
+  });
+});
+
+describe('plateOriginFromTags', () => {
+  it('maps domestic and foreign plate tags', () => {
+    expect(plateOriginFromTags(['Domaće tablice'])).toBe('domestic');
+    expect(plateOriginFromTags(['Garancija', 'Strane tablice'])).toBe(
+      'foreign',
+    );
+  });
+
+  it('does not guess when the tag is absent', () => {
+    expect(plateOriginFromTags(['Garancija', 'Na ime kupca'])).toBeNull();
+    expect(plateOriginFromTags([])).toBeNull();
+    expect(plateOriginFromTags(undefined)).toBeNull();
+  });
+});
+
+describe('normalizePlateOrigin', () => {
+  it('keeps known values and nulls everything else', () => {
+    expect(normalizePlateOrigin('domestic')).toBe('domestic');
+    expect(normalizePlateOrigin('foreign')).toBe('foreign');
+    expect(normalizePlateOrigin('strane')).toBeNull();
+    expect(normalizePlateOrigin(null)).toBeNull();
+    expect(normalizePlateOrigin(undefined)).toBeNull();
   });
 });

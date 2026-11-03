@@ -36,7 +36,6 @@ good car deals/
 │   └── public/
 ├── packages/shared/             # Shared Listing interface
 ├── docs/                        # Design docs (deal score v2)
-├── scrape-local.bat             # Local scraper launcher (Windows)
 └── render.yaml                  # Render Blueprint (API service)
 ```
 
@@ -44,13 +43,13 @@ good car deals/
 
 ```
 Local PC (weekly scheduled task, home IP)
-  └─ scrape-local.bat → impit (Chrome TLS fingerprint) scrapes polovniautomobili.com
+  └─ NestJS CLI --scrape mode → impit scrapes polovniautomobili.com
        └─ Saves to Neon PostgreSQL
             └─ Render serves NestJS API (SKIP_STARTUP_SCRAPE=true, no scraping there)
                  └─ Vercel serves Next.js frontend (CDN)
 ```
 
-- **Scraping runs from a residential IP only** — polovniautomobili.com blocks all cloud providers (403), so Render/GitHub Actions cannot scrape. Run `.\scrape-local.bat` weekly (or let the local scheduled task do it).
+- **Scraping runs from a residential IP only** — polovniautomobili.com blocks all cloud providers (403), so Render/GitHub Actions cannot scrape. Run the scraper locally (weekly scheduled task) or with `--scrape` flag.
 - **API on Render** has `SKIP_STARTUP_SCRAPE=true`; the in-app weekly cron only fires where scraping is possible (locally).
 - **Frontend on Vercel** fetches from Render API via `NEXT_PUBLIC_API_URL`.
 
@@ -68,7 +67,7 @@ npm run dev        # API (port 3001) + frontend (port 3000)
 ```bash
 npm run dev              # API + frontend concurrently
 npm run build            # Build API for production
-.\scrape-local.bat       # Scrape listings from home IP → save to Neon DB
+npm run build            # nest build
 
 # API
 cd good-car-deals-api
@@ -87,7 +86,7 @@ npm run lint             # ESLint
 
 ## How It Works
 
-1. **Scrape (local, weekly)** — `impit` with a Chrome TLS fingerprint fetches 15 pages of classified listings from the home IP (cloud IPs get 403).
+1. **Scrape (local, weekly)** — `impit` with a Chrome TLS fingerprint fetches classified listings from the home IP (cloud IPs get 403). Runs from a residential IP only — never from Render/GitHub Actions.
 2. Each listing is parsed (title, price, year, mileage, etc.) and upserted into Neon PostgreSQL via Prisma.
 3. **Deal scoring (v2)** — per-model expected price from an OLS fit (age/km/kW terms, IQR-trimmed, mean-imputed kW) with a cell-median fallback; `deviationPct` → 5-tier badge + 0–100 market-percentile score (`src/analysis/deal-stats.ts`).
 4. Classified listings are served at `GET /deals`, sorted by `dealScore` desc.

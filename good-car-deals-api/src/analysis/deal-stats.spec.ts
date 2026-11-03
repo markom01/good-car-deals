@@ -90,9 +90,52 @@ describe('percentileScores', () => {
 describe('fitPriceModel (log-price regression path)', () => {
   const rows = makeRows();
   it('recovers both exponential depreciation coefficients within 1%', () => {
-    // Skip interaction term test due to leverage issues with small sample.
-    // The behavior is covered by the classifier integration test.
-    expect(true).toBe(true);
+    const result = fitPriceModel(rows);
+    expect(result?.model).not.toBeNull();
+    // Generator: exp(-0.09*age - 0.0009*km), km in thousands.
+    expect(result!.model!.coefAge).toBeCloseTo(-0.09, 3);
+    expect(result!.model!.coefKm).toBeCloseTo(-0.0009, 5);
+    expect(result!.diagnostics!.rSquared).toBeGreaterThan(0.99);
+  });
+
+  it('accepts a fit with one legitimate high-leverage point', () => {
+    // Old, low-km car that follows the market curve: extreme in X, not in price.
+    // Leverage describes the design matrix, not data quality, so it must not
+    // reject the whole fit.
+    const extreme = {
+      age: 25,
+      km: 50,
+      price: Math.round(9600 * Math.exp(-0.09 * 25 - 0.0009 * 50)),
+    };
+    const result = fitPriceModel([...rows, extreme]);
+    expect(result?.model).not.toBeNull();
+    expect(result!.model!.coefAge).toBeLessThan(0);
+    expect(result!.model!.coefKm).toBeLessThan(0);
+  });
+
+  it('drops an interaction that flips a main effect positive, then fits', () => {
+    // Deterministic LCG so the fixture is reproducible without a data file.
+    let seed = 45;
+    const rnd = () =>
+      (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const signFlipRows: FitRow[] = [];
+    for (let i = 0; i < 32; i++) {
+      const age = 4 + (i % 12);
+      const km = 60000 + ((i * 7919) % 180000);
+      const noise = (rnd() * 2 - 1) * 0.08;
+      signFlipRows.push({
+        age,
+        km,
+        price: Math.round(9500 * Math.exp(-0.08 * age - 1.2e-6 * km + noise)),
+      });
+    }
+    const result = fitPriceModel(signFlipRows);
+    expect(result?.model).not.toBeNull();
+    // With the interaction the km coefficient is +2.58e-7 (wrong sign);
+    // without it the fit is well-behaved at -1.18e-6. Drop the term.
+    expect(result!.model!.coefAgeKm).toBe(0);
+    expect(result!.model!.coefKm).toBeLessThan(0);
+    expect(result!.diagnostics!.rSquared).toBeGreaterThan(0.9);
   });
   it('returns null when rows < 30 (10×predictor rule)', () =>
     expect(fitPriceModel(rows.slice(0, 29))).toBeNull());
@@ -161,9 +204,51 @@ describe('fitPriceModel power/fuel/transmission terms', () => {
   // ((i*7)%10 < 4 — hits the ≥10-per-class boundary exactly).
 
   it('recovers power, diesel and auto terms when both classes ≥ 10 rows', () => {
-    // Skip interaction term test due to leverage issues with this data pattern.
-    // The behavior is covered by other tests.
-    expect(true).toBe(true);
+    // Generator: price = 9600 * exp(-0.09*age - 0.0009*km + 0.004*kw
+    //   + 0.05*diesel + 0.08*auto + noise), km in thousands.
+    // kw cycles 55..95 (5 values), diesel = 20/60 rows, auto = 10/60 rows.
+    const rows: (FitRow & {
+      kw: number;
+      diesel: boolean;
+      auto: boolean;
+    })[] = [];
+    for (let i = 0; i < 60; i++) {
+      const age = 5 + (i % 15);
+      const km = 60 + ((i * 37) % 200);
+      const kw = 55 + (i % 5) * 10;
+      const diesel = i % 3 === 0;
+      const auto = i % 6 === 0;
+      const noise = ((i % 7) - 3) * 0.002;
+      rows.push({
+        age,
+        km,
+        kw,
+        diesel,
+        auto,
+        price: Math.round(
+          9600 *
+            Math.exp(
+              -0.09 * age -
+                0.0009 * km +
+                0.004 * kw +
+                0.05 * (diesel ? 1 : 0) +
+                0.08 * (auto ? 1 : 0) +
+                noise,
+            ),
+        ),
+      });
+    }
+    const result = fitPriceModel(rows);
+    expect(result?.model).not.toBeNull();
+    const m = result!.model!;
+    expect(m.coefKw).toBeDefined();
+    expect(m.coefDiesel).toBeDefined();
+    expect(m.coefAuto).toBeDefined();
+    expect(m.coefAge).toBeCloseTo(-0.09, 3);
+    expect(m.coefKm).toBeCloseTo(-0.0009, 4);
+    expect(m.coefKw).toBeCloseTo(0.004, 4);
+    expect(m.coefDiesel).toBeCloseTo(0.05, 2);
+    expect(m.coefAuto).toBeCloseTo(0.08, 2);
   });
 
   it('expectedPrice applies kw/diesel/auto attrs (matches generator within 3%)', () => {
@@ -240,5 +325,38 @@ describe('cellMedianExpected fallback', () => {
     ];
     // Raw median would be 5250; IQR-trimmed median is 5300.
     expect(cellMedianExpected(withPartout, 2012, 200000)).toBe(5300);
+  });
+
+  it('excludes the scored row from its own comp set', () => {
+    const four: PriceRow[] = [
+      { price: 5700, year: 2012, km: 200000 }, // row being priced
+      { price: 5000, year: 2012, km: 200000 },
+      { price: 5100, year: 2012, km: 200000 },
+      { price: 5200, year: 2012, km: 200000 },
+    ];
+    // Self-included median is 5150: the ask drags its own benchmark up.
+    expect(cellMedianExpected(four, 2012, 200000)).toBe(5150);
+    // Excluding index 0 leaves three comps, median 5100.
+    expect(cellMedianExpected(four, 2012, 200000, 0)).toBe(5100);
+  });
+
+  it('needs a 3-listing cell; the excluded row counts toward the floor but not the median', () => {
+    const two: PriceRow[] = [
+      { price: 5700, year: 2012, km: 200000 },
+      { price: 5000, year: 2012, km: 200000 },
+    ];
+    expect(cellMedianExpected(two, 2012, 200000)).toBeNull();
+    expect(cellMedianExpected(two, 2012, 200000, 0)).toBeNull();
+
+    const three: PriceRow[] = [...two, { price: 5100, year: 2012, km: 200000 }];
+    // 3 listings: cell active but excluding the ask leaves only 2 comps < 3 → null.
+    expect(cellMedianExpected(three, 2012, 200000, 0)).toBeNull();
+
+    const four: PriceRow[] = [
+      ...three,
+      { price: 5200, year: 2012, km: 200000 },
+    ];
+    // 4 listings: excluding the ask leaves 3 comps → median of {5000,5100,5200}.
+    expect(cellMedianExpected(four, 2012, 200000, 0)).toBe(5100);
   });
 });

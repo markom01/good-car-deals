@@ -24,12 +24,11 @@ async function bootstrap() {
     const prismaService = app.get(PrismaService);
     const cronService = app.get(CronService);
 
-    // ── Scrape-only mode (used by GitHub Action) ──────────────
+    // ── Scrape-only mode (used by the local scheduled task) ───
     // Run: node dist/src/main.js --scrape
+    // Resumes from the last saved page if a previous run was interrupted.
     if (process.argv.includes('--scrape')) {
-      console.log('Scrape-only mode: clearing old listings...');
-      await prismaService.listing.deleteMany({});
-      console.log('Running scrape...');
+      console.log('Running scrape (resumable)...');
       await cronService.handleWeeklyScrape();
       console.log('Scrape complete');
       await prismaService.$disconnect();
@@ -59,11 +58,7 @@ async function bootstrap() {
     }
 
     // Run initial scrape in background (non-blocking)
-    console.log('Clearing old listings...');
-    const deleted = await prismaService.listing.deleteMany({});
-    console.log(`Deleted ${deleted.count} old listings`);
-
-    console.log('Running initial scrape...');
+    console.log('Running initial scrape (resumable)...');
     await cronService.handleWeeklyScrape();
     console.log('Initial scrape complete');
   } catch (error) {

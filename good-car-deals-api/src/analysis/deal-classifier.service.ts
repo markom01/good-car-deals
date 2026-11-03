@@ -11,6 +11,7 @@ import {
   percentileScores,
   type TierName,
 } from './deal-stats';
+import { resolveGeneration } from './generation-resolver';
 
 export interface ListingWithDeal {
   id: bigint;
@@ -47,6 +48,59 @@ export interface ClassifierRow {
   powerKw?: number | null;
   fuelType?: string | null;
   transmission?: string | null;
+  /**
+   * Generation resolved from the offline artifact. Only used for grouping
+   * when that generation has enough comps to fit on its own; see
+   * GENERATION_MIN_COMPARABLES.
+   */
+  generation?: string | null;
+}
+
+/**
+ * Minimum usable comps before a generation is fitted separately.
+ *
+ * Holdout sweep on the full 18,745-row snapshot (MdAPE, lower is better):
+ * model-only 10.63%, t=3 10.08, t=5 10.06, t=6 10.05, t=8 10.04,
+ * t=10 10.06, t=12 10.09, t=20 10.21, t=40 10.30, t=60 10.44.
+ * The curve is flat between 3 and 12 and degrades above 20, so 10 is the
+ * widest gate that stays at the minimum. Coverage: 285 generations /
+ * 12,162 rated rows (65.2%) at t=10 versus 102 / 8,846 (47.4%) at t=40.
+ */
+export const GENERATION_MIN_COMPARABLES = 10;
+
+const GROUP_KEY_SEPARATOR = '\u0000';
+
+function generationGroupKey(model: string | null, generation: string): string {
+  return `${model ?? ''}${GROUP_KEY_SEPARATOR}${generation}`;
+}
+
+/**
+ * Assign each row to a fit group. A generation becomes its own group only
+ * when it holds at least GENERATION_MIN_COMPARABLES usable rows; otherwise
+ * the row stays in its model group, so thin generations never get an
+ * unstable standalone fit.
+ */
+function buildGroupKeys(rows: ClassifierRow[]): Map<number, string> {
+  const generationCounts = new Map<string, number>();
+  for (const r of rows) {
+    if (!r.generation || !isClassifiable(r)) continue;
+    const key = generationGroupKey(r.model, r.generation);
+    generationCounts.set(key, (generationCounts.get(key) ?? 0) + 1);
+  }
+
+  const keys = new Map<number, string>();
+  for (const r of rows) {
+    const modelKey = r.model ?? '';
+    if (!r.generation) {
+      keys.set(r.id, modelKey);
+      continue;
+    }
+    const key = generationGroupKey(r.model, r.generation);
+    const eligible =
+      (generationCounts.get(key) ?? 0) >= GENERATION_MIN_COMPARABLES;
+    keys.set(r.id, eligible ? key : modelKey);
+  }
+  return keys;
 }
 
 export interface ClassifyResult {
@@ -100,16 +154,19 @@ function scoreRow(id: number, expected: number, price: number): ClassifyResult {
 
 /**
  * Pure v2 classification over grouped rows (no Nest, no DB).
- * Per model group: try a per-model OLS fit (IQR trim inside); on fit
- * failure fall back to per-row year±1 / km±20% cell median. Rows without
- * a positive expected price → UNRATED with score 0. Rows trimmed from
- * the fit still get scored. Two model groups never share a fit.
+ * Per group: try a per-group OLS fit (IQR trim inside); on fit failure fall
+ * back to per-row year±1 / km±20% cell median. Rows without a positive
+ * expected price → UNRATED with score 0. Rows trimmed from the fit still get
+ * scored. Groups start as model labels; a generation replaces the model as
+ * the group only when it has GENERATION_MIN_COMPARABLES usable rows.
+ * Two groups never share a fit.
  */
 export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
   const results = new Map<number, ClassifyResult>();
+  const groupKeys = buildGroupKeys(rows);
   const groups = new Map<string, ClassifierRow[]>();
   for (const r of rows) {
-    const key = r.model ?? '';
+    const key = groupKeys.get(r.id) ?? r.model ?? '';
     const g = groups.get(key);
     if (g) g.push(r);
     else groups.set(key, [r]);
@@ -138,7 +195,13 @@ export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
     if (fitResult?.model) {
       const model = fitResult.model;
       const groupPrices = usable.map((r) => r.priceNumeric!);
-      for (const r of usable) {
+      const cellRows = usable.map((u) => ({
+        price: u.priceNumeric!,
+        year: u.year!,
+        km: u.mileageKm!,
+      }));
+      for (let i = 0; i < usable.length; i++) {
+        const r = usable[i];
         // expectedPrice returns NaN for out-of-sample (age/km outside training range)
         const raw = expectedPrice(model, r.age!, r.mileageKm!, {
           kw: r.powerKw,
@@ -148,15 +211,7 @@ export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
         // Out-of-sample → fallback to cell median (comps), not clamping
         const exp = Number.isFinite(raw)
           ? clampExpected(raw, groupPrices)
-          : cellMedianExpected(
-              usable.map((u) => ({
-                price: u.priceNumeric!,
-                year: u.year!,
-                km: u.mileageKm!,
-              })),
-              r.year!,
-              r.mileageKm!,
-            );
+          : cellMedianExpected(cellRows, r.year!, r.mileageKm!, i);
         results.set(
           r.id,
           exp === null
@@ -170,8 +225,9 @@ export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
         year: u.year!,
         km: u.mileageKm!,
       }));
-      for (const r of usable) {
-        const exp = cellMedianExpected(cellRows, r.year!, r.mileageKm!);
+      for (let i = 0; i < usable.length; i++) {
+        const r = usable[i];
+        const exp = cellMedianExpected(cellRows, r.year!, r.mileageKm!, i);
         results.set(
           r.id,
           exp === null
@@ -230,6 +286,7 @@ export class DealClassifierService {
       powerKw: l.powerKw,
       fuelType: l.fuelType,
       transmission: l.transmission,
+      generation: resolveGeneration(l.model, l.year),
     }));
 
     // Keep price_per_year populated for display/sorting compatibility.
@@ -245,20 +302,28 @@ export class DealClassifierService {
 
     const results = classifyGroups(rows);
 
-    await Promise.all(
-      results.map((r) =>
-        this.prismaService.listing.update({
-          where: { id: BigInt(r.id) },
-          data: {
-            dealType: r.dealType,
-            dealScore: r.dealScore,
-            expectedPrice: r.expectedPrice,
-            deviationPct: r.deviationPct,
-            pricePerYear: pricePerYearById.get(r.id) ?? null,
-          },
-        }),
-      ),
-    );
+    // One update per row; chunked so a 70k-row snapshot does not open 70k
+    // concurrent queries against the Prisma pool at once.
+    const UPDATE_BATCH_SIZE = 500;
+    for (let i = 0; i < results.length; i += UPDATE_BATCH_SIZE) {
+      await Promise.all(
+        results.slice(i, i + UPDATE_BATCH_SIZE).map((r) =>
+          this.prismaService.listing.update({
+            where: { id: BigInt(r.id) },
+            data: {
+              dealType: r.dealType,
+              dealScore: r.dealScore,
+              expectedPrice: r.expectedPrice,
+              deviationPct: r.deviationPct,
+              pricePerYear: pricePerYearById.get(r.id) ?? null,
+            },
+          }),
+        ),
+      );
+      this.logger.log(
+        `Persisted classification ${Math.min(i + UPDATE_BATCH_SIZE, results.length)}/${results.length}`,
+      );
+    }
 
     this.logger.log(
       `Classification complete. Classified ${results.length} listings`,

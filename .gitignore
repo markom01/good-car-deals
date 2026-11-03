@@ -13,9 +13,6 @@ __pycache__/
 .vercel
 *.py
 
-# Local scraper script
-scrape-local.bat
-
 # CodeGraph index (regenerable)
 .codegraph/
 

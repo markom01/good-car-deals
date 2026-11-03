@@ -89,7 +89,7 @@ function makeGroupRows(model: string, factor: number): ClassifierRow[] {
     const age = 6 + (i % 7) * 2; // 6..18
     const kmThousands = 60 + ((i * 13) % 9) * 18; // 60..204
     rows.push({
-      id: (model === 'Astra J' ? 700 : 712) + i,
+      id: (model === 'Astra J' ? 700 : 800) + i,
       model,
       priceNumeric: Math.round(
         genPrice(age, kmThousands) * factor + ((i % 5) * 8 - 16),
@@ -101,7 +101,6 @@ function makeGroupRows(model: string, factor: number): ClassifierRow[] {
   }
   return rows;
 }
-
 describe('classifyGroups', () => {
   it('regression path: scores the cheap-but-consistent row BEST, part-out row scored not crashed', () => {
     const rows = [...makeMarketRows(), belowMarketRow(), partOutRow()];
@@ -117,15 +116,15 @@ describe('classifyGroups', () => {
       {
         id: 810,
         model: 'Astra K thin',
-        priceNumeric: 5200,
-        year: 2011,
-        age: 15,
-        mileageKm: 180000,
+        priceNumeric: 5000,
+        year: 2012,
+        age: 14,
+        mileageKm: 200000,
       },
       {
         id: 811,
         model: 'Astra K thin',
-        priceNumeric: 5400,
+        priceNumeric: 5100,
         year: 2012,
         age: 14,
         mileageKm: 200000,
@@ -133,22 +132,54 @@ describe('classifyGroups', () => {
       {
         id: 812,
         model: 'Astra K thin',
-        priceNumeric: 5600,
+        priceNumeric: 5200,
         year: 2012,
         age: 14,
-        mileageKm: 220000,
+        mileageKm: 200000,
       },
       {
         id: 813,
         model: 'Astra K thin',
         priceNumeric: 5300,
-        year: 2013,
-        age: 13,
-        mileageKm: 190000,
+        year: 2012,
+        age: 14,
+        mileageKm: 200000,
+      },
+      {
+        id: 814,
+        model: 'Astra K thin',
+        priceNumeric: 5400,
+        year: 2012,
+        age: 14,
+        mileageKm: 200000,
+      },
+      {
+        id: 815,
+        model: 'Astra K thin',
+        priceNumeric: 5050,
+        year: 2012,
+        age: 14,
+        mileageKm: 200000,
+      },
+      {
+        id: 816,
+        model: 'Astra K thin',
+        priceNumeric: 5150,
+        year: 2012,
+        age: 14,
+        mileageKm: 200000,
+      },
+      {
+        id: 817,
+        model: 'Astra K thin',
+        priceNumeric: 5350,
+        year: 2012,
+        age: 14,
+        mileageKm: 200000,
       },
     ];
     const out = classifyGroups(rows);
-    expect(out).toHaveLength(4);
+    expect(out).toHaveLength(8);
     for (const r of out) {
       expect(r.dealType).not.toBe('UNRATED');
       expect(r.expectedPrice).not.toBeNull();

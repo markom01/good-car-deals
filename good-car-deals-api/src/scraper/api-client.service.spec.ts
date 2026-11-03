@@ -88,7 +88,20 @@ describe('ApiClientService', () => {
       powerKw: '100',
       transmission: 'Manuelni 6 brzina',
       location: 'Novi Sad',
+      plateOrigin: null,
     });
+  });
+
+  it('maps plate-origin tags from the feed', async () => {
+    fetchJson.mockResolvedValue(
+      searchPayload({ tags: ['Garancija', 'Strane tablice'] }),
+    );
+    const imported = await service.fetchSearchPage(1);
+    expect(imported.listings[0].plateOrigin).toBe('foreign');
+
+    fetchJson.mockResolvedValue(searchPayload({ tags: ['Domaće tablice'] }));
+    const domestic = await service.fetchSearchPage(1);
+    expect(domestic.listings[0].plateOrigin).toBe('domestic');
   });
 
   it('turns diacritics and punctuation into a url-safe slug', async () => {
@@ -133,6 +146,8 @@ describe('ApiClientService', () => {
     expect(url).not.toContain('brand=');
     expect(url).not.toContain('model');
     expect(url).toContain('page=2');
+    // 200 is the feed's maximum; 250 silently falls back to 25.
+    expect(url).toContain('pageSize=200');
     expect(url).toContain('sort=basic');
     expect(url).toContain('onlyWithPrice=true');
     expect(url).toContain('damaged%5B0%5D=notDamaged');
@@ -148,26 +163,5 @@ describe('ApiClientService', () => {
 
     expect(fetchPage).toHaveBeenCalledTimes(1); // build id fetched after the 404
     expect(page.listings).toHaveLength(1);
-  });
-
-  it('reports a listing as active from the detail API', async () => {
-    fetchJson.mockResolvedValue({ status: 'active' });
-
-    await expect(service.isListingActive('30120777')).resolves.toBe(true);
-    expect(fetchJson.mock.calls[0][0]).toContain(
-      '/api/v1/classifieds/car/30120777',
-    );
-  });
-
-  it('reports a missing listing as inactive', async () => {
-    fetchJson.mockRejectedValue(new HttpError(404));
-
-    await expect(service.isListingActive('999')).resolves.toBe(false);
-  });
-
-  it('keeps a listing when its status cannot be verified', async () => {
-    fetchJson.mockRejectedValue(new Error('ECONNRESET'));
-
-    await expect(service.isListingActive('30120777')).resolves.toBe(true);
   });
 });

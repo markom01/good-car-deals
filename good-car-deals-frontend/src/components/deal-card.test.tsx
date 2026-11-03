@@ -33,6 +33,21 @@ describe('DealCard', () => {
     expect(screen.getByText('72')).toBeInTheDocument();
   });
 
+  it('flags foreign-plated import cars', () => {
+    const imported = { ...baseListing, plateOrigin: 'foreign' } as Listing;
+    render(<DealCard deal={imported} />);
+    expect(screen.getByText('Foreign plates')).toBeInTheDocument();
+    expect(
+      screen.getByText(/import duty and registration not included/i),
+    ).toBeInTheDocument();
+  });
+
+  it('does not flag domestic cars', () => {
+    const domestic = { ...baseListing, plateOrigin: 'domestic' } as Listing;
+    render(<DealCard deal={domestic} />);
+    expect(screen.queryByText('Foreign plates')).not.toBeInTheDocument();
+  });
+
   it('links out to the listing', () => {
     const withUrl = {
       ...baseListing,

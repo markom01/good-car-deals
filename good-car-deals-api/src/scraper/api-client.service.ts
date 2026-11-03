@@ -1,40 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService, HttpError } from './http.service';
-import { RawListingData } from './html-parser.service';
-
-export interface SearchPage {
-  listings: RawListingData[];
-  pageCount: number;
-}
-
-interface SearchResult {
-  id?: string | number;
-  title?: string;
-  year?: number;
-  mileage?: number | null;
-  fuel?: string;
-  engineVolume?: number | null;
-  power?: number | null;
-  gearBox?: string;
-  price?: number | null;
-  city?: string;
-  status?: string;
-  brand?: string;
-  model?: string;
-}
-
-interface SearchPayload {
-  pageProps?: {
-    searchResults?: {
-      pageCount?: number;
-      results?: SearchResult[];
-    };
-  };
-}
+import {
+  RawListingData,
+  SearchPage,
+  SearchPayload,
+  SearchResult,
+} from './types';
+import { plateOriginFromTags } from '../utils/normalization';
 
 const SITE = 'https://www.polovniautomobili.com';
-const CORE_API = 'https://core.polovniautomobili.com/api/v1';
 
 @Injectable()
 export class ApiClientService {
@@ -71,25 +46,6 @@ export class ApiClientService {
   }
 
   /**
-   * Check whether an ad is still live via the detail API.
-   * A 404 means the ad is gone; any other failure is treated as unverifiable
-   * so a transient network error never deletes a listing.
-   */
-  async isListingActive(adId: string): Promise<boolean> {
-    try {
-      const detail = await this.httpService.fetchJson<{ status?: string }>(
-        `${CORE_API}/classifieds/car/${adId}`,
-      );
-      return detail.status === 'active';
-    } catch (error) {
-      if (error instanceof HttpError && error.status === 404) {
-        return false;
-      }
-      return true;
-    }
-  }
-
-  /**
    * Fetch JSON, refreshing the cached build id once when the deploy changed
    * and the old data endpoint answers 404.
    */
@@ -121,6 +77,13 @@ export class ApiClientService {
 
     if (page !== undefined) {
       url.searchParams.set('page', String(page));
+    }
+    // 200 is the largest page size the feed honours (250 falls back to 25).
+    // At 25/page the site caps deep pagination at page 750, so a full pass
+    // would silently stop at ~18,750 ads; at 200/page the whole site fits
+    // inside that cap.
+    if (!url.searchParams.has('pageSize')) {
+      url.searchParams.set('pageSize', '200');
     }
     if (!url.searchParams.has('sort')) {
       url.searchParams.set('sort', 'basic');
@@ -196,6 +159,7 @@ export class ApiClientService {
       powerKw: result.power ? String(result.power) : '',
       transmission: result.gearBox ?? '',
       location: result.city ?? '',
+      plateOrigin: plateOriginFromTags(result.tags),
     };
   }
 

@@ -25,6 +25,8 @@ model Listing {
   powerKw      Int?     @map("power_kw")
   transmission String?
   location     String?
+  /// "Poreklo vozila" from the feed tags: domestic | foreign | null
+  plateOrigin  String?  @map("plate_origin")
   expectedPrice Float?  @map("expected_price")
   deviationPct Float?   @map("deviation_pct")
   scrapedAt    DateTime @default(now()) @map("scraped_at")
@@ -35,6 +37,21 @@ model Listing {
   @@index([model])
   @@index([scrapedAt])
   @@map("listings")
+}
+
+/// Scrape checkpoint so an interrupted run resumes where it stopped
+/// instead of refetching every page already saved.
+model ScrapeProgress {
+  key       String   @id
+  targetUrl String   @map("target_url")
+  lastPage  Int      @map("last_page")
+  pageCount Int      @map("page_count")
+  /// "running" = resumable, "done" = next run starts fresh
+  status    String
+  startedAt DateTime @map("started_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("scrape_progress")
 }
 
 model PushSubscription {

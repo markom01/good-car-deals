@@ -3,6 +3,8 @@
  * Port of Python scraper.py and deal_finder.py normalization logic
  */
 
+import type { PlateOrigin } from '@good-car-deals/shared';
+
 /**
  * Normalize mileage string to integer
  * Input: "360.000 km" → 360000
@@ -157,4 +159,29 @@ export function calculatePricePerYear(
   if (age === null || age <= 0) return null;
 
   return priceNumeric / age;
+}
+
+/**
+ * "Poreklo vozila" from the search-feed `tags` array.
+ * Foreign-plated cars are imports: their ask excludes Serbian import duty,
+ * VAT and registration, so their price is not comparable to a domestic car.
+ * Unknown/absent tags stay null — never guess domestic.
+ */
+export function plateOriginFromTags(
+  tags?: string[] | null,
+): PlateOrigin | null {
+  if (!tags || tags.length === 0) return null;
+  if (tags.includes('Strane tablice')) return 'foreign';
+  if (tags.includes('Domaće tablice')) return 'domestic';
+  return null;
+}
+
+/**
+ * Narrow a persisted plate-origin value back to the shared union.
+ * Anything unexpected (old rows, manual edits) becomes null.
+ */
+export function normalizePlateOrigin(
+  value?: string | null,
+): PlateOrigin | null {
+  return value === 'domestic' || value === 'foreign' ? value : null;
 }

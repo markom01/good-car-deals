@@ -15,11 +15,10 @@ Scrapes classified car listings from `polovniautomobili.com` site-wide (all bran
 
 ```
 Local PC (Windows Task Scheduler — weekly Sunday 00:00)
-  └─ scrape-local.bat
-       └─ NestJS CLI --scrape mode → impit scrapes polovniautomobili.com (home IP)
-            └─ Saves ~2.5k listings → Neon PostgreSQL (free tier)
-                 └─ Render (free) serves NestJS API → port 10000
-                      └─ Vercel (free) serves Next.js frontend → CDN
+  └─ NestJS CLI --scrape mode → impit scrapes polovniautomobili.com (home IP)
+       └─ Saves ~2.5k listings → Neon PostgreSQL (free tier)
+            └─ Render (free) serves NestJS API → port 10000
+                 └─ Vercel (free) serves Next.js frontend → CDN
 ```
 
 | Layer    | Hosting                | URL                                        | Notes                                          |
@@ -37,7 +36,6 @@ good car deals/
 ├── good-car-deals-frontend/     # Next.js App Router frontend
 ├── packages/shared/             # Single `Listing` interface
 ├── docs/superpowers/specs/      # Design docs (deal score v2)
-├── scrape-local.bat             # Windows batch file — runs scraper locally
 ├── render.yaml                  # Render Blueprint (API service)
 └── vercel.json                  # Vercel monorepo config (API deploys disabled)
 ```
@@ -64,8 +62,9 @@ good car deals/
 - **UI**: shadcn/ui (Radix Luma style) + Lucide icons
 - **Data**: TanStack React Query v5 for client-side data fetching
 - **DB**: Prisma with PostgreSQL — `BigInt` IDs, snake_case column mapping via `@map()`
-- **Scraping**: `impit` transport → Next.js `/_next/data` search JSON + `core.polovniautomobili.com/api/v1` detail API; `cheerio` parser kept only as legacy fallback
-- **Deal scoring**: v2 comps-relative — per-model log-price OLS/cell-median expected price (clamped to observed age/km + price band) → % deviation (capped ±50) → 5-tier badge + 0–100 score (`good-car-deals-api/src/analysis/deal-stats.ts`)
+- **Scraping**: `impit` transport → Next.js `/_next/data` search JSON feed only (`pageSize=200`, the site maximum); the per-ad detail API is no longer called — the feed already returns `status === 'active'` rows. The site caps deep pagination at **page 750** and re-serves page 1 past it, so `scrapeAndSaveResumable` aborts with `scrape_progress.status = 'capped'` when a page brings zero new URLs; `cheerio` parser kept only as legacy fallback
+- **Deal scoring**: v2 comps-relative — per-model log-price OLS/cell-median expected price (clamped to observed age/km + price band) → % deviation (capped ±50) → 5-tier badge + 0–100 score (`good-car-deals-api/src/analysis/deal-stats.ts`); model groups split into generation groups when the offline artifact resolves one generation with ≥10 usable rows (`generation-resolver.ts`; holdout sweep: MdAPE 10.04–10.06 at 6–10 comps vs 10.63 model-only and 10.30 at 40)
+- **Card benchmark**: `deals.service.ts` pools expected prices by resolved generation across **all years** of that generation (no year window) and requires ≥3 comps. `resolveGeneration` falls back to the **nearest generation** for boundary/gap years (e.g. Laguna 2001 → Mk2) so every resolvable model gets a benchmark; only models absent from the artifact show no average.
 - **Residential proxy**: Optional — set `SCRAPER_PROXY_URL` env var if using a proxy service
 - **Monorepo**: npm workspaces, shared types package consumed from source (no build step)
 - **API security**: `helmet` on the Express app, `@nestjs/throttler` global guard (100 req/min per IP), optional `CORS_ORIGIN` allowlist (unset = allow all)
@@ -100,7 +99,7 @@ good car deals/
 npm run dev                    # Run API + frontend concurrently
 
 # Production scrape (run locally from home IP)
-.\scrape-local.bat
+npm run start:dev -- --scrape   # or run via local scheduled task with --scrape flag
 
 # API (good-car-deals-api/)
 npm run start:dev              # Watch mode
