@@ -101,10 +101,6 @@ export function DealCard({ deal }: { deal: Listing }) {
               ? Math.round(deal.dealScore).toLocaleString('en-US')
               : 'N/A'}
           </span>
-          <span className="text-muted-foreground">Price/Year</span>
-          <span className="text-right font-mono tabular-nums">
-            {formatNumber(deal.pricePerYear)}
-          </span>
         </div>
       </CardContent>
 
