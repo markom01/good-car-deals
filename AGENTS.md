@@ -35,7 +35,7 @@ good car deals/
 ├── good-car-deals-api/          # NestJS backend — REST + scraping
 ├── good-car-deals-frontend/     # Next.js App Router frontend
 ├── packages/shared/             # Single `Listing` interface
-├── docs/superpowers/specs/      # Design docs (deal score v2)
+├── docs/superpowers/specs/      # Design docs (deal score v3, generation-only)
 ├── render.yaml                  # Render Blueprint (API service)
 └── vercel.json                  # Vercel monorepo config (API deploys disabled)
 ```

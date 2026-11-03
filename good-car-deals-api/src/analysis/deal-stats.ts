@@ -1,8 +1,10 @@
-// Pure statistics helpers for Deal Score v2 (no Nest, no Prisma, no network).
+// Pure statistics helpers for Deal Score v3 (no Nest, no Prisma, no network).
 // Methodology: generation-only comparison. Each listing is benchmarked against
-// the IQR-trimmed median price of its own generation, shifted by a robust
-// Theil–Sen km slope. No hedonic regression, no per-row fallback.
-// See docs/superpowers/specs/2026-10-27-deal-score-v2-design.md.
+// the IQR-trimmed median ask price of its own resolved generation, shifted by a
+// robust Theil–Sen km slope (mileage adjustment; plain median fallback when the
+// slope is degenerate or >= 0). No model-wide pooling, no cross-generation
+// comps, no hedonic regression.
+// UNRATED when the trimmed kept set has < 4 rows.
 
 export type TierName =
   | 'GREAT DEAL'
