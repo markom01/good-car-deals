@@ -51,9 +51,9 @@ describe('Full Flow E2E - Fresh Scrape → Save → Classify → Verify', () => 
     const saved = await scraperService.saveListings(listings);
     console.log(`  Saved ${saved.length} listings to DB`);
 
-    // Step3: Classify
+    // Step3: Classify deals (bounded to keep the e2e fast)
     console.log('Step 3: Classifying deals...');
-    const classified = await dealClassifierService.classifyDeals();
+    const classified = await dealClassifierService.classifyDeals(1);
     console.log(`  Classified ${classified} listings`);
 
     // Step4: Verify via API

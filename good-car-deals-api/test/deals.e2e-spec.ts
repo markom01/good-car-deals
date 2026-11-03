@@ -160,6 +160,9 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
           year: { not: null },
           title: { not: '' },
           mileageKm: { not: null },
+          // Must match the service's where clause in deals.service.ts:
+          // foreign-plate imports ("Strane tablice") are excluded from /deals.
+          OR: [{ plateOrigin: 'domestic' }, { plateOrigin: null }],
         },
       });
 

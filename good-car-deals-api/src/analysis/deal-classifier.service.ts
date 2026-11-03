@@ -182,18 +182,25 @@ export class DealClassifierService {
   constructor(private prismaService: PrismaService) {}
 
   /**
-   * Classify all listings in the database (v2): model+generation comps —
+   * Classify listings in the database (v2): model+generation comps —
    * per-group median ask adjusted to each row's odometer by a Theil-Sen
    * km slope, then % deviation → 5-tier label + 0-100 absolute score.
+   * When `limit` is given, only the `limit` most recently scraped listings
+   * are classified (useful for fast e2e smoke tests); otherwise all rows
+   * are re-labeled in place so stale labels from a previous pass are cleared.
    * @returns Number of classified listings
    */
-  async classifyDeals(): Promise<number> {
+  async classifyDeals(limit?: number): Promise<number> {
     this.logger.log('Starting deal classification...');
 
-    // Fetch ALL listings: rows whose price turned non-numeric (e.g.
+    // Fetch ALL listings by default: rows whose price turned non-numeric (e.g.
     // "Price on request") must still be re-labeled in place — otherwise
     // they keep a stale GREAT/GOOD label from a previous pass.
-    const listings = await this.prismaService.listing.findMany({});
+    // With a limit, fetch only the most recently scraped `limit` rows.
+    const listings = await this.prismaService.listing.findMany({
+      take: limit,
+      orderBy: limit ? { scrapedAt: 'desc' } : undefined,
+    });
 
     if (listings.length === 0) {
       this.logger.warn('No listings found to classify');
