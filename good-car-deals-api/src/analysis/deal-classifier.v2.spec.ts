@@ -1,8 +1,11 @@
 import { classifyGroups, type ClassifierRow } from './deal-classifier.service';
 import { MAX_DEVIATION_PCT } from './deal-stats';
 
-const GEN_A = 'Astra J (2009-2015)';
-const GEN_B = 'Astra K (2015-2021)';
+// Real artifact-style names: Opel Astra generations are 'F', 'G', 'H', 'J',
+// 'K', 'L' in generation-periods.json. Short names also expose the collision
+// defect — 'MK1' and 'J' are shared by hundreds of other models.
+const GEN_A = 'J';
+const GEN_B = 'K';
 
 // Rows for one generation share model 'Opel Astra' + a generation string.
 // Price must DECREASE as km increases: the benchmark's Theil-Sen slope is only
@@ -13,10 +16,11 @@ function genRow(
   km: number,
   price: number,
   generation: string = GEN_A,
+  model = 'Opel Astra',
 ): ClassifierRow {
   return {
     id,
-    model: 'Opel Astra',
+    model,
     generation,
     priceNumeric: price,
     year,
@@ -43,6 +47,41 @@ describe('classifyGroups (generation-only)', () => {
     expect(a.expectedPrice! / b.expectedPrice!).toBeGreaterThan(1.05);
     expect(a.dealType).not.toBe('UNRATED');
     expect(b.dealType).not.toBe('UNRATED');
+  });
+
+  it('same generation name under different models → separate benchmarks', () => {
+    // Artifact generations are model-relative: 'MK1' is shared by hundreds of
+    // models. Two models at very different price levels must not share a pool.
+    const peugeot = Array.from({ length: 6 }, (_, i) =>
+      genRow(
+        500 + i,
+        2013 + i,
+        100_000 + i * 10_000,
+        9_000 - i * 100,
+        'MK1',
+        'Peugeot 208',
+      ),
+    );
+    const duster = Array.from({ length: 6 }, (_, i) =>
+      genRow(
+        510 + i,
+        2013 + i,
+        100_000 + i * 10_000,
+        5_000 - i * 50,
+        'MK1',
+        'Dacia Duster',
+      ),
+    );
+    const out = classifyGroups([...peugeot, ...duster]);
+    // Rows at the same odometer, one per model.
+    const p = out.find((r) => r.id === 500)!;
+    const d = out.find((r) => r.id === 510)!;
+    expect(p.expectedPrice).not.toBeNull();
+    expect(d.expectedPrice).not.toBeNull();
+    expect(p.dealType).not.toBe('UNRATED');
+    expect(d.dealType).not.toBe('UNRATED');
+    // Shared-pool bug would put both near the combined median (~7_000).
+    expect(p.expectedPrice! / d.expectedPrice!).toBeGreaterThan(1.05);
   });
 
   it('pool below 5 usable rows → every row UNRATED (no 3-row scoring)', () => {

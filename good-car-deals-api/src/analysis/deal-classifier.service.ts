@@ -43,8 +43,10 @@ export interface ClassifierRow {
   age: number | null;
   mileageKm: number | null;
   /**
-   * Generation resolved upstream by `resolveGeneration(model, year)`. It is the
-   * only grouping key: rows without one are UNRATED and never pooled.
+   * Generation resolved upstream by `resolveGeneration(model, year)`. Artifact
+   * generation names are model-relative ('MK1', 'J', ...), so the grouping key
+   * is model + generation: rows without a generation are UNRATED and never
+   * pooled.
    */
   generation?: string | null;
 }
@@ -102,12 +104,23 @@ function scoreRow(
 }
 
 /**
+ * Group key for a resolved generation. Artifact names are model-relative — the
+ * same string ('MK1', 'J', ...) is shared by hundreds of models — so pooling on
+ * the generation alone would merge unrelated cars. NUL cannot appear in either
+ * part, so the composite key is unambiguous.
+ */
+function groupKey(r: ClassifierRow): string {
+  return `${r.model ?? ''}\u0000${r.generation}`;
+}
+
+/**
  * Pure v2 classification over grouped rows (no Nest, no DB).
- * The group key is exactly the row's resolved generation, so two generations
- * of the same model never share a benchmark. Per group: pool every usable row,
- * take the generation median ask price adjusted to the row's own odometer by a
- * robust Theil-Sen km slope (`benchmarkExpected`), then score the % deviation on
- * the absolute rubric (`dealScoreFromDeviation`).
+ * The group key is model + resolved generation, so two generations of the same
+ * model — and the same generation name under different models — never share a
+ * benchmark. Per group: pool every usable row, take the generation median ask
+ * price adjusted to the row's own odometer by a robust Theil-Sen km slope
+ * (`benchmarkExpected`), then score the % deviation on the absolute rubric
+ * (`dealScoreFromDeviation`).
  * Rows without a generation, rows failing `isClassifiable`, and every row of a
  * group below GENERATION_MIN_RATED usable rows are UNRATED (score 0, no
  * benchmark).
@@ -121,9 +134,10 @@ export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
       results.set(r.id, UNRATED_RESULT(r.id));
       continue;
     }
-    const group = groups.get(r.generation);
+    const key = groupKey(r);
+    const group = groups.get(key);
     if (group) group.push(r);
-    else groups.set(r.generation, [r]);
+    else groups.set(key, [r]);
   }
 
   for (const group of groups.values()) {
@@ -168,8 +182,8 @@ export class DealClassifierService {
   constructor(private prismaService: PrismaService) {}
 
   /**
-   * Classify all listings in the database (v2): generation-only comps —
-   * per-generation median ask adjusted to each row's odometer by a Theil-Sen
+   * Classify all listings in the database (v2): model+generation comps —
+   * per-group median ask adjusted to each row's odometer by a Theil-Sen
    * km slope, then % deviation → 5-tier label + 0-100 absolute score.
    * @returns Number of classified listings
    */
