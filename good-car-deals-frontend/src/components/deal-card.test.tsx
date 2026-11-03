@@ -20,6 +20,8 @@ const baseListing: Listing = {
   dealScore: 72,
   dealType: 'GOOD DEAL',
   pricePerYear: 350,
+  expectedPrice: 4000,
+  deviationPct: 12.6,
 } as unknown as Listing;
 
 describe('DealCard', () => {
@@ -61,6 +63,32 @@ describe('DealCard', () => {
     );
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('flags a below-benchmark ask with a default badge', () => {
+    render(<DealCard deal={baseListing} />);
+    const badge = screen.getByText('+13%');
+    expect(badge).toHaveAttribute('data-variant', 'default');
+    expect(
+      screen.getByText(/vs generation benchmark €4,000 \(mileage-adjusted\)/),
+    ).toBeInTheDocument();
+  });
+
+  it('flags an above-benchmark ask with a destructive badge', () => {
+    const overpriced = { ...baseListing, deviationPct: -8.4 } as Listing;
+    render(<DealCard deal={overpriced} />);
+    const badge = screen.getByText('-8%');
+    expect(badge).toHaveAttribute('data-variant', 'destructive');
+  });
+
+  it('hides the benchmark line when the row carries no benchmark', () => {
+    const unrated = {
+      ...baseListing,
+      expectedPrice: null,
+      deviationPct: null,
+    } as Listing;
+    render(<DealCard deal={unrated} />);
+    expect(screen.queryByText(/generation benchmark/)).not.toBeInTheDocument();
   });
 
   it('shows N/A for missing values instead of crashing', () => {

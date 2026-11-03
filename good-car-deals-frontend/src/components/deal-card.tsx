@@ -71,27 +71,26 @@ export function DealCard({ deal }: { deal: Listing }) {
           </div>
         )}
 
-        {deal.priceToGenerationAvgPct !== null &&
-          deal.generationMedianPriceNumeric !== null && (
-            <div className="flex items-center gap-2">
-              <Badge
-                variant={
-                  deal.priceToGenerationAvgPct < 0
-                    ? 'default'
-                    : deal.priceToGenerationAvgPct > 0
-                      ? 'destructive'
-                      : 'ghost'
-                }
-              >
-                {deal.priceToGenerationAvgPct > 0 ? '+' : ''}
-                {Math.round(deal.priceToGenerationAvgPct)}%
-              </Badge>
-              <span className="text-muted-foreground text-xs">
-                compared to generation median of €{' '}
-                {formatNumber(deal.generationMedianPriceNumeric)}
-              </span>
-            </div>
-          )}
+        {deal.deviationPct != null && deal.expectedPrice != null && (
+          <div className="flex items-center gap-2">
+            <Badge
+              variant={
+                deal.deviationPct > 0
+                  ? 'default'
+                  : deal.deviationPct < 0
+                    ? 'destructive'
+                    : 'ghost'
+              }
+            >
+              {deal.deviationPct > 0 ? '+' : ''}
+              {Math.round(deal.deviationPct)}%
+            </Badge>
+            <span className="text-muted-foreground text-xs">
+              vs generation benchmark €{formatNumber(deal.expectedPrice)}{' '}
+              (mileage-adjusted)
+            </span>
+          </div>
+        )}
 
         <Separator />
 

@@ -21,13 +21,10 @@ export interface Listing {
   pricePerYear: number | null;
   scrapedAt: string;
   updatedAt: string;
-  /** Flat average expected price across the listing's generation. */
-  generationAvgPriceNumeric: number | null;
-  /** Median expected price across the listing's generation. */
-  generationMedianPriceNumeric: number | null;
-  priceToGenerationAvgPct: number | null;
-  expectedPrice?: number | null;
-  deviationPct?: number | null;
+  /** Mileage-adjusted generation benchmark, stored by the classifier. */
+  expectedPrice: number | null;
+  /** Ask vs benchmark, stored by the classifier; positive = cheaper than benchmark. */
+  deviationPct: number | null;
   fuelType?: string | null;
   engineCc?: number | null;
   powerKw?: number | null;

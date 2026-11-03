@@ -5,19 +5,6 @@ import { normalizePlateOrigin } from '../utils/normalization';
 import { resolveGeneration } from '../analysis/generation-resolver';
 import { DealSort } from './deals.controller';
 
-/** Minimum rated rows before a generation average is shown. */
-const MIN_GROUP_SIZE = 3;
-
-const GROUP_KEY_SEPARATOR = '\u0000';
-
-const median = (prices: number[]): number => {
-  const sorted = [...prices].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
-};
-
 @Injectable()
 export class DealsService {
   private readonly logger = new Logger(DealsService.name);
@@ -26,13 +13,15 @@ export class DealsService {
 
   /**
    * Get good deals only (v2 gate: dealType GREAT DEAL or GOOD DEAL), sorted
-   * by the given sort option, with the flat average expected price of the
-   * listing's own generation (every year of that generation, no year window)
-   * and the listing's percentage deviation from it.
+   * by the given sort option.
    *
-   * Grouping follows `resolveGeneration`, the same unit the classifier fits.
-   * A row whose year is ambiguous between two generations resolves to `null`
-   * and shows no average at all — a model-wide number would mix generations.
+   * `expectedPrice` and `deviationPct` are read straight from the row: the
+   * classifier already persisted the generation benchmark (mileage-adjusted
+   * per listing) and the deviation from it (positive = ask below benchmark).
+   * Display recomputes nothing, so the card always matches the stored score.
+   *
+   * `generation` is still resolved per row from the offline artifact for the
+   * card description; a year ambiguous between two generations yields `null`.
    *
    * Foreign-plate imports ("Strane tablice") are excluded: their ask excludes
    * Serbian import duty, VAT and registration, so they are not comparable to
@@ -62,63 +51,11 @@ export class DealsService {
       orderBy,
     });
 
-    // Pool every rated row by generation. Tier-agnostic on purpose: a good
-    // deal is compared against the whole market, not against other deals.
-    // Foreign-plate rows are excluded so the benchmark stays domestic-only.
-    const poolRows = await this.prismaService.listing.findMany({
-      where: {
-        model: { not: null },
-        expectedPrice: { not: null },
-        year: { not: null },
-        OR: [{ plateOrigin: 'domestic' }, { plateOrigin: null }],
-      },
-      select: { model: true, year: true, expectedPrice: true },
-    });
-
-    const poolsByGeneration = new Map<string, number[]>();
-    for (const p of poolRows) {
-      const generation = resolveGeneration(p.model, p.year);
-      if (generation === null) continue;
-      const key = `${p.model!}${GROUP_KEY_SEPARATOR}${generation}`;
-      const pool = poolsByGeneration.get(key);
-      if (pool) pool.push(p.expectedPrice!);
-      else poolsByGeneration.set(key, [p.expectedPrice!]);
-    }
-
     return listings.map((listing) => {
       const generation =
         listing.model !== null
           ? resolveGeneration(listing.model, listing.year)
           : null;
-
-      let generationAvg: number | null = null;
-      let generationMedian: number | null = null;
-      if (generation !== null && listing.model !== null) {
-        const pool =
-          poolsByGeneration.get(
-            `${listing.model}${GROUP_KEY_SEPARATOR}${generation}`,
-          ) ?? [];
-        if (pool.length >= MIN_GROUP_SIZE) {
-          generationAvg =
-            pool.reduce((sum, price) => sum + price, 0) / pool.length;
-          generationMedian = median(pool);
-        }
-      }
-
-      // Deviation is measured against the generation median so the badge and
-      // the "compared to generation median of €X" line stay consistent.
-      let pct: number | null = null;
-      if (
-        generationMedian !== null &&
-        generationMedian !== 0 &&
-        listing.priceNumeric !== null
-      ) {
-        pct = Math.round(
-          ((Number(listing.priceNumeric) - generationMedian) /
-            generationMedian) *
-            100,
-        );
-      }
 
       return {
         ...listing,
@@ -128,9 +65,6 @@ export class DealsService {
         priceNumeric:
           listing.priceNumeric !== null ? Number(listing.priceNumeric) : null,
         generation,
-        generationAvgPriceNumeric: generationAvg,
-        generationMedianPriceNumeric: generationMedian,
-        priceToGenerationAvgPct: pct,
         plateOrigin: normalizePlateOrigin(listing.plateOrigin),
       };
     });
