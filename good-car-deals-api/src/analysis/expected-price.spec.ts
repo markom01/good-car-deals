@@ -70,7 +70,7 @@ describe('computeExpectedPrices (property-based model)', () => {
     for (let i = 0; i < fit.length; i++) {
       expect(out[i].expectedPrice).not.toBeNull();
       expect(
-        Math.abs(Math.log(out[i].expectedPrice) - Math.log(fit[i].price)),
+        Math.abs(Math.log(out[i].expectedPrice!) - Math.log(fit[i].price)),
       ).toBeLessThan(1e-6);
     }
   });
@@ -79,12 +79,12 @@ describe('computeExpectedPrices (property-based model)', () => {
     const fit = Array.from({ length: 12 }, (_, i) =>
       row({ id: i + 1, age: i, km: 50_000 + i * 10_000, price: 10_000 }),
     );
-    const before = computeExpectedPrices(fit).find((r) => r.id === 1);
+    const before = computeExpectedPrices(fit).find((r) => r.id === 1)!;
     const changed = fit.map((r) => (r.id === 1 ? { ...r, price: 10_100 } : r));
-    const after = computeExpectedPrices(changed).find((r) => r.id === 1);
-    expect(before.expectedPrice).not.toBeNull();
-    expect(after.expectedPrice).not.toBeNull();
-    expect(after.expectedPrice).toBeCloseTo(before.expectedPrice, 9);
+    const after = computeExpectedPrices(changed).find((r) => r.id === 1)!;
+    expect(before!.expectedPrice).not.toBeNull();
+    expect(after!.expectedPrice).not.toBeNull();
+    expect(after!.expectedPrice!).toBeCloseTo(before!.expectedPrice!, 9);
   });
 
   it('needs 10 comps excluding the scored row', () => {
@@ -116,13 +116,13 @@ describe('computeExpectedPrices (property-based model)', () => {
     const flat = out.filter((r) => r.id !== 100);
     for (const r of flat) {
       expect(r.expectedPrice).not.toBeNull();
-      expect(r.expectedPrice).toBeCloseTo(10_000, 6);
+      expect(r.expectedPrice!).toBeCloseTo(10_000, 6);
       expect(r.sampleSize).toBe(10);
     }
-    const o = out.find((r) => r.id === 100);
-    expect(o.expectedPrice).not.toBeNull();
-    expect(o.expectedPrice).toBeCloseTo(10_000, 6);
-    expect(o.sampleSize).toBe(11);
+    const o = out.find((r) => r.id === 100)!;
+    expect(o!.expectedPrice).not.toBeNull();
+    expect(o!.expectedPrice!).toBeCloseTo(10_000, 6);
+    expect(o!.sampleSize).toBe(11);
   });
 
   it('clamps an extreme probe to the observed price band', () => {
@@ -138,8 +138,8 @@ describe('computeExpectedPrices (property-based model)', () => {
     const probe = row({ id: 99, age: 80, km: 900_000 });
     const out = computeExpectedPrices(fit, [probe])[0];
     expect(out.expectedPrice).not.toBeNull();
-    expect(out.expectedPrice).toBeGreaterThanOrEqual(Math.min(...prices));
-    expect(out.expectedPrice).toBeLessThanOrEqual(Math.max(...prices));
+    expect(out.expectedPrice!).toBeGreaterThanOrEqual(Math.min(...prices));
+    expect(out.expectedPrice!).toBeLessThanOrEqual(Math.max(...prices));
   });
 
   it('imputes missing power, fuel, and transmission', () => {
@@ -154,7 +154,7 @@ describe('computeExpectedPrices (property-based model)', () => {
     });
     const out = computeExpectedPrices(fit, [probe])[0];
     expect(out.expectedPrice).not.toBeNull();
-    expect(out.expectedPrice).toBeCloseTo(10_000, 2);
+    expect(out.expectedPrice!).toBeCloseTo(10_000, 2);
     expect(out.sampleSize).toBe(12);
   });
 
@@ -170,7 +170,7 @@ describe('computeExpectedPrices (property-based model)', () => {
     );
     const out = computeExpectedPrices(fit);
     expect(out.every((r) => r.expectedPrice !== null)).toBe(true);
-    expect(out.every((r) => Number.isFinite(r.expectedPrice))).toBe(true);
+    expect(out.every((r) => Number.isFinite(r.expectedPrice!))).toBe(true);
   });
 
   it('charges more for power and diesel within a group', () => {
@@ -188,11 +188,11 @@ describe('computeExpectedPrices (property-based model)', () => {
       row({ id: 90, powerKw: 80 }),
       row({ id: 91, powerKw: 135 }),
     ]);
-    expect(lowPower.expectedPrice).not.toBeNull();
-    expect(highPower.expectedPrice).not.toBeNull();
-    expect(lowPower.expectedPrice).toBeGreaterThan(0);
-    expect(highPower.expectedPrice).toBeGreaterThan(
-      lowPower.expectedPrice * 1.15,
+    expect(lowPower!.expectedPrice).not.toBeNull();
+    expect(highPower!.expectedPrice).not.toBeNull();
+    expect(lowPower!.expectedPrice!).toBeGreaterThan(0);
+    expect(highPower!.expectedPrice!).toBeGreaterThan(
+      lowPower!.expectedPrice! * 1.15,
     );
 
     const fuelFit = [
@@ -207,9 +207,9 @@ describe('computeExpectedPrices (property-based model)', () => {
       row({ id: 92, fuelType: 'Dizel' }),
       row({ id: 93, fuelType: 'Benzin' }),
     ]);
-    expect(diesel.expectedPrice).not.toBeNull();
-    expect(petrol.expectedPrice).not.toBeNull();
-    expect(diesel.expectedPrice).toBeGreaterThan(petrol.expectedPrice);
+    expect(diesel!.expectedPrice).not.toBeNull();
+    expect(petrol!.expectedPrice).not.toBeNull();
+    expect(diesel!.expectedPrice!).toBeGreaterThan(petrol!.expectedPrice!);
   });
 
   it('is deterministic', () => {
