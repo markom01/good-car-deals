@@ -22,6 +22,7 @@ const baseListing: Listing = {
   pricePerYear: 350,
   expectedPrice: 4000,
   deviationPct: 12.6,
+  expectedPriceSampleSize: 42,
 } as unknown as Listing;
 
 describe('DealCard', () => {
@@ -65,30 +66,44 @@ describe('DealCard', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
-  it('flags a below-benchmark ask with a default badge', () => {
+  it('shows the typical asking price and comp count', () => {
     render(<DealCard deal={baseListing} />);
     const badge = screen.getByText('+13%');
     expect(badge).toHaveAttribute('data-variant', 'default');
+    expect(screen.getByText(/below typical asking price/)).toBeInTheDocument();
     expect(
-      screen.getByText(/vs generation benchmark €4,000 \(mileage-adjusted\)/),
+      screen.getByText(/€4,000 · based on 42 similar ads/),
     ).toBeInTheDocument();
   });
 
-  it('flags an above-benchmark ask with a destructive badge', () => {
+  it('says above typical for a negative deviation', () => {
     const overpriced = { ...baseListing, deviationPct: -8.4 } as Listing;
     render(<DealCard deal={overpriced} />);
-    const badge = screen.getByText('-8%');
-    expect(badge).toHaveAttribute('data-variant', 'destructive');
+    expect(screen.getByText('-8%')).toHaveAttribute(
+      'data-variant',
+      'destructive',
+    );
+    expect(screen.getByText(/above typical asking price/)).toBeInTheDocument();
   });
 
-  it('hides the benchmark line when the row carries no benchmark', () => {
+  it('hides the price line when expectedPrice is null', () => {
     const unrated = {
       ...baseListing,
       expectedPrice: null,
       deviationPct: null,
     } as Listing;
     render(<DealCard deal={unrated} />);
-    expect(screen.queryByText(/generation benchmark/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/typical asking price/)).not.toBeInTheDocument();
+  });
+
+  it('omits the comp clause when the sample size is missing', () => {
+    const noCount = {
+      ...baseListing,
+      expectedPriceSampleSize: null,
+    } as Listing;
+    render(<DealCard deal={noCount} />);
+    expect(screen.getByText('€4,000')).toBeInTheDocument();
+    expect(screen.queryByText(/based on/)).not.toBeInTheDocument();
   });
 
   it('shows N/A for missing values instead of crashing', () => {
