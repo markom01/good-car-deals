@@ -72,6 +72,7 @@ export interface ClassifyResult {
 
 function isClassifiable(r: ClassifierRow): boolean {
   return (
+    r.model !== null &&
     r.priceNumeric !== null &&
     r.priceNumeric > 0 &&
     r.year !== null &&
@@ -141,7 +142,7 @@ export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
     model: r.model!,
     generation: r.generation!,
     price: r.priceNumeric!,
-    age: new Date().getFullYear() - r.year!,
+    age: r.age ?? new Date().getFullYear() - r.year!,
     km: r.mileageKm!,
     powerKw: r.powerKw,
     fuelType: r.fuelType,
