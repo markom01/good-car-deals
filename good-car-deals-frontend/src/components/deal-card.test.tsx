@@ -77,9 +77,9 @@ describe('DealCard', () => {
   });
 
   it('says above typical for a negative deviation', () => {
-    const overpriced = { ...baseListing, deviationPct: -8.4 } as Listing;
+    const overpriced = { ...baseListing, priceNumeric: 6000 } as Listing;
     render(<DealCard deal={overpriced} />);
-    expect(screen.getByText('-8%')).toHaveAttribute(
+    expect(screen.getByText('-50%')).toHaveAttribute(
       'data-variant',
       'destructive',
     );

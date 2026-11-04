@@ -71,36 +71,45 @@ export function DealCard({ deal }: { deal: Listing }) {
           </div>
         )}
 
-        {deal.deviationPct != null && deal.expectedPrice != null && (
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Badge
-                variant={
-                  deal.deviationPct > 0
-                    ? 'default'
-                    : deal.deviationPct < 0
-                      ? 'destructive'
-                      : 'ghost'
-                }
-              >
-                {deal.deviationPct < 0 ? '-' : ''}
-                {Math.round(Math.abs(deal.deviationPct))}%
-              </Badge>
-              <span className="text-muted-foreground text-xs">
-                {deal.deviationPct > 0
-                  ? 'below typical asking price'
-                  : deal.deviationPct < 0
-                    ? 'above typical asking price'
-                    : 'at typical asking price'}
-              </span>
+        {deal.deviationPct != null &&
+          deal.expectedPrice != null &&
+          deal.priceNumeric != null && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant={
+                    deal.expectedPrice > deal.priceNumeric
+                      ? 'default'
+                      : deal.expectedPrice < deal.priceNumeric
+                        ? 'destructive'
+                        : 'ghost'
+                  }
+                >
+                  {deal.expectedPrice < deal.priceNumeric ? '-' : ''}
+                  {Math.round(
+                    Math.abs(
+                      ((deal.expectedPrice - deal.priceNumeric) /
+                        deal.expectedPrice) *
+                        100,
+                    ),
+                  )}
+                  %
+                </Badge>
+                <span className="text-muted-foreground text-xs">
+                  {deal.expectedPrice > deal.priceNumeric
+                    ? 'below typical asking price'
+                    : deal.expectedPrice < deal.priceNumeric
+                      ? 'above typical asking price'
+                      : 'at typical asking price'}
+                </span>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {deal.expectedPriceSampleSize != null
+                  ? `€${formatNumber(deal.expectedPrice)} · based on ${deal.expectedPriceSampleSize} similar ads`
+                  : `€${formatNumber(deal.expectedPrice)}`}
+              </p>
             </div>
-            <p className="text-muted-foreground text-xs">
-              {deal.expectedPriceSampleSize != null
-                ? `€${formatNumber(deal.expectedPrice)} · based on ${deal.expectedPriceSampleSize} similar ads`
-                : `€${formatNumber(deal.expectedPrice)}`}
-            </p>
-          </div>
-        )}
+          )}
 
         <Separator />
 
