@@ -21,13 +21,18 @@ src/
 │   ├── cron.service.ts         # @Cron(EVERY_WEEK), orchestrates scrape→save→classify
 │   └── scraper.module.ts
 ├── analysis/            # Deal classification
-│   ├── deal-classifier.service.ts   # Grouping + scoring (OLS + cell-median)
-│   ├── deal-stats.ts                # Pure math: IQR trim, OLS fit, tiers, percentiles
+│   ├── deal-classifier.service.ts   # Classification + persistence (property-based expected price)
+│   ├── deal-classifier.v2.spec.ts   # Pure classifier tests
+│   ├── deal-classifier.service.spec.ts # Service persistence tests
+│   ├── expected-price.ts            # Fit/predict math (OLS, shrinkage, LOO, gate)
+│   ├── expected-price.spec.ts       # Unit tests for expected-price model
+│   ├── deal-stats.ts                # Tier/score/deviation/IQR helpers only
+│   ├── deal-stats.spec.ts           # Rubric + IQR tests
 │   ├── generation-resolver.ts       # Offline artifact → one generation or null
 │   └── generation-periods.json      # Model generations (auto-parts-db artifact)
 ├── deals/               # REST endpoint
 │   ├── deals.controller.ts    # GET /deals
-│   ├── deals.service.ts       # Sorted by dealScore (or pricePerYear) + flat generation benchmark
+│   ├── deals.service.ts       # Reads stored expected price/comps, no recompute
 │   └── deals.module.ts
 ├── utils/               # Standalone helpers
 │   └── normalization.ts       # Mileage, price, model, age, pricePerYear
@@ -45,14 +50,14 @@ src/
 
 ## DEAL CLASSIFICATION
 
-v3 generation-only scoring in `deal-classifier.service.ts` + pure math in `src/analysis/deal-stats.ts`:
+v4 property-based expected pricing in `deal-classifier.service.ts` + `expected-price.ts` + `deal-stats.ts`:
 
-- **Generation-only benchmark** — `generation-resolver.ts` maps `model` + `year` to exactly one generation from the offline artifact (`generation-periods.json`). Boundary/gap years fall back to the **nearest generation**; models absent from the artifact resolve to `null`. Rows are grouped by the composite key `model\0generation` (artifact generation names are model-relative, e.g. 'MK1' collides across 455+ models). Rows with unresolved generation → `UNRATED`, no benchmark, never pooled.
-- **Expected price per row** — Per group, `expectedPrice` = the generation's IQR-trimmed median ask price, mileage-adjusted by a robust Theil–Sen slope fitted on the group's `{ price, km }` rows (stride subsampling at > 500 rows, no RNG). Adjustment targets the row's own odometer and clamps to the IQR-trimmed price range. Slope `≥ 0`, non-finite, or degenerate km span → plain trimmed median (no adjustment). Group scored only when its usable pool ≥ `GENERATION_MIN_RATED` (5); below → every row in the group `UNRATED`. No model-wide pooling, no year±1 cell, no cross-generation comps.
-- **Deviation → score → tier** — `deviationPct = (expected − ask) / expected × 100` (positive = cheaper than expected), **capped at ±50** (`MAX_DEVIATION_PCT`) before scoring. Score is absolute, not percentile: `dealScore = clamp(round(50 + dev), 0, 100)`. Tier euro gates: `GREAT DEAL` = dev ≥ 10% AND devEur ≥ €500; `GOOD DEAL` = dev ≥ 4% AND devEur ≥ €200 (devEur = dev × expected / 100, from capped dev); one-level demotion when the euro leg fails (GREAT → GOOD → FAIR); `FAIR PRICE` = (−4, +4); `HIGH PRICE` = (−10, −4]; `OVERPRICED` = ≤ −10. Missing year/km/price or non-positive expected price → `UNRATED` with score 0.
-- **Persistence** — Each pass writes `dealType`, `dealScore`, `expectedPrice`, `deviationPct` (+ keeps `pricePerYear` for display/sort compat).
+- **Expected price per row** — `expected-price.ts` fits a within-group log-price OLS over `[age, km/10_000, ln(powerKw), diesel, gas, hybrid, electric, automatic]` (petrol base), partially pools group intercepts through model → global (k=8), predicts with leave-one-out (the scored row is excluded from its own group, model, and global sums). Group = `model\0generation` from `generation-resolver.ts`. IQR-trim fit rows when ≥8 fit rows exist. Clamp age/km/ln(power) to group bounds; clamp expected price to group price band. **No prediction range.**
+- **Gate** — a row scores only when its group has ≥10 kept comps **excluding the row** (`EXPECTED_PRICE_MIN_COMPS = 10`). Thin groups are `UNRATED` with no average.
+- **Deviation → score → tier** — unchanged: `deviationPct = (expected − ask) / expected × 100` capped at ±50, `dealScore = clamp(round(50 + dev), 0, 100)`, tier euro gates unchanged.
+- **Persistence** — Each pass writes `dealType`, `dealScore`, `expectedPrice`, `deviationPct`, plus `expectedPriceSampleSize` (comps excluding the row) (+ keeps `pricePerYear` for display/sort compat).
 - **CLI** — Re-run classification without scraping: `node dist/src/main.js --classify` (one-shot, mutates DB labels in place, then exits).
-- **Deploy note** — Render boot (`prisma db push` + `SKIP_STARTUP_SCRAPE=true`) picks up the v3 columns automatically; first `/deals` after deploy returns [] until `node dist/src/main.js --classify` runs.
+- **Deploy note** — Render boot (`prisma db push` + `SKIP_STARTUP_SCRAPE=true`) adds the nullable `expected_price_sample_size` column automatically; first `/deals` after deploy returns [] until `node dist/src/main.js --classify` runs. Deploy the frontend copy **after** the reclassify pass so the card never labels old benchmark values as "typical asking price".
 
 ## KEY FILES
 
@@ -61,6 +66,7 @@ v3 generation-only scoring in `deal-classifier.service.ts` + pure math in `src/a
 | `app.module.ts`                   | Root module, imports ConfigModule.forRoot (with validate), ScheduleModule.forRoot, ThrottlerModule, Prisma, Scraper, Analysis, Deals; registers global ThrottlerGuard |
 | `main.ts`                         | `BigInt.prototype.toJSON`, `helmet()`, CORS with optional `CORS_ORIGIN` allowlist, `--scrape` CLI flag, `SKIP_STARTUP_SCRAPE` env var                                 |
 | `cron.service.ts`                 | `@Cron(CronExpression.EVERY_WEEK)` — entry point for full pipeline                                                                                                    |
+| `expected-price.ts`               | Fit/predict math: within-group log-price OLS, hierarchical shrinkage, leave-one-out, gate, clamps (no Nest/Prisma)                                                    |
 | `src/config/validation.schema.ts` | 3 required env vars (DATABASE_URL, SCRAPER_TARGET_URL, SCRAPER_CRON_SCHEDULE) + optional SCRAPER_BRAND/SCRAPER_MODEL (unused), SCRAPER_PROXY_URL, CORS_ORIGIN         |
 | `prisma/schema.prisma`            | Single `Listing` model — BigInt id, snake_case via `@map()`, table `listings`, indexes on dealScore/dealType/model/scrapedAt                                          |
 
@@ -70,14 +76,14 @@ v3 generation-only scoring in `deal-classifier.service.ts` + pure math in `src/a
 - **E2E** — `test/*.e2e-spec.ts` with Supertest. Config: `test/jest-e2e.json`.
 - **Setup** — `src/.jest/set-env.ts` loads test env vars before suite.
 
-Current test files: `app.controller.spec.ts`, `deal-classifier.v2.spec.ts`, `deal-stats.spec.ts`, `generation-resolver.spec.ts`, `deals.service.spec.ts`, `http.service.spec.ts`, `http.service.liveness.spec.ts`, `scraper.service.spec.ts`, `normalization.spec.ts`. E2E: `app.e2e-spec.ts`, `deals.e2e-spec.ts`, `e2e-qa.e2e-spec.ts`, `full-flow.e2e-spec.ts` (full-flow does LIVE scraping from the local IP).
+Current test files: `app.controller.spec.ts`, `deal-classifier.v2.spec.ts`, `deal-classifier.service.spec.ts`, `deal-stats.spec.ts`, `expected-price.spec.ts`, `generation-resolver.spec.ts`, `deals.service.spec.ts`, `http.service.spec.ts`, `http.service.liveness.spec.ts`, `scraper.service.spec.ts`, `normalization.spec.ts`. E2E: `app.e2e-spec.ts`, `deals.e2e-spec.ts`, `e2e-qa.e2e-spec.ts`, `full-flow.e2e-spec.ts` (full-flow does LIVE scraping from the local IP).
 
 ## GOTCHAS
 
 - **No persistence on scrape** — When startup scrape is enabled (no `SKIP_STARTUP_SCRAPE`), ALL listings are deleted and rescraped: DB is a fresh snapshot per boot. Render sets `SKIP_STARTUP_SCRAPE=true`, so the deployed DB accumulates instead.
 - **BigInt serialization** — `main.ts` patches `BigInt.prototype.toJSON` to `Number()` so Prisma BigInt IDs survive `JSON.stringify`.
 - **Cloudflare bypass** — `impit` with `browser: 'chrome'` TLS fingerprint. Still may get 403s on aggressive runs.
-- **Card benchmark needs density** — the `/deals` card average only fires when the listing's resolved generation has 3+ rated comps; unresolved generations show no average.
+- **Expected price needs density** — the card shows no average when a listing's group has fewer than 10 comps excluding the row; unresolved generations show no average.
 - **Cron + startup are same path** — Both call `handleWeeklyScrape()`. Startup always runs it synchronously during `bootstrap()`.
 - **`.env` is gitignored** — Never commit it; it holds the live Neon credentials (password rotation still pending — see root AGENTS.md anti-patterns).
 - **Scraper is site-specific** — Parser selectors target `polovniautomobili.com` DOM. Will break if site redesigns.

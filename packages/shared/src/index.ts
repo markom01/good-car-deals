@@ -21,10 +21,12 @@ export interface Listing {
   pricePerYear: number | null;
   scrapedAt: string;
   updatedAt: string;
-  /** Mileage-adjusted generation benchmark, stored by the classifier. */
+  /** Typical asking price for a car with these properties, stored by the classifier. */
   expectedPrice: number | null;
-  /** Ask vs benchmark, stored by the classifier; positive = cheaper than benchmark. */
+  /** Ask vs expected price, stored by the classifier; positive = cheaper than typical. */
   deviationPct: number | null;
+  /** Number of comparable listings behind expectedPrice, excluding this listing. */
+  expectedPriceSampleSize?: number | null;
   fuelType?: string | null;
   engineCc?: number | null;
   powerKw?: number | null;

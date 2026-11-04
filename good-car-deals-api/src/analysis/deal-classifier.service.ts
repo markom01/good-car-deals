@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  benchmarkExpected,
   capDeviation,
   classifyTier,
   dealScoreFromDeviation,
@@ -9,6 +8,11 @@ import {
   type TierName,
 } from './deal-stats';
 import { resolveGeneration } from './generation-resolver';
+import {
+  computeExpectedPrices,
+  type ExpectedPriceRow,
+  EXPECTED_PRICE_MIN_COMPS,
+} from './expected-price';
 
 export interface ListingWithDeal {
   id: bigint;
@@ -31,6 +35,7 @@ export interface ListingWithDeal {
   location: string | null;
   expectedPrice: number | null;
   deviationPct: number | null;
+  expectedPriceSampleSize: number | null;
   scrapedAt: Date;
   updatedAt: Date;
 }
@@ -42,6 +47,9 @@ export interface ClassifierRow {
   year: number | null;
   age: number | null;
   mileageKm: number | null;
+  powerKw: number | null;
+  fuelType: string | null;
+  transmission: string | null;
   /**
    * Generation resolved upstream by `resolveGeneration(model, year)`. Artifact
    * generation names are model-relative ('MK1', 'J', ...), so the grouping key
@@ -51,19 +59,21 @@ export interface ClassifierRow {
   generation?: string | null;
 }
 
-/** Minimum usable rows before a generation gets its own benchmark. */
-export const GENERATION_MIN_RATED = 5;
-
+/**
+ * Minimum comparable rows behind an expected price, excluding the scored row.
+ */
 export interface ClassifyResult {
   id: number;
   dealType: TierName;
   dealScore: number;
   expectedPrice: number | null;
   deviationPct: number | null;
+  sampleSize: number | null;
 }
 
 function isClassifiable(r: ClassifierRow): boolean {
   return (
+    r.model !== null &&
     r.priceNumeric !== null &&
     r.priceNumeric > 0 &&
     r.year !== null &&
@@ -78,12 +88,14 @@ const UNRATED_RESULT = (id: number): ClassifyResult => ({
   dealScore: 0,
   expectedPrice: null,
   deviationPct: null,
+  sampleSize: null,
 });
 
 function scoreRow(
   id: number,
   benchmark: number,
   price: number,
+  sampleSize: number | null,
 ): ClassifyResult {
   if (benchmark <= 0 || !Number.isFinite(benchmark)) {
     return UNRATED_RESULT(id);
@@ -100,74 +112,55 @@ function scoreRow(
     dealScore: dealScoreFromDeviation(dev),
     expectedPrice: benchmark,
     deviationPct: dev,
+    sampleSize,
   };
 }
 
 /**
- * Group key for a resolved generation. Artifact names are model-relative — the
- * same string ('MK1', 'J', ...) is shared by hundreds of models — so pooling on
- * the generation alone would merge unrelated cars. NUL cannot appear in either
- * part, so the composite key is unambiguous.
- */
-function groupKey(r: ClassifierRow): string {
-  return `${r.model ?? ''}\u0000${r.generation}`;
-}
-
-/**
- * Pure v2 classification over grouped rows (no Nest, no DB).
- * The group key is model + resolved generation, so two generations of the same
- * model — and the same generation name under different models — never share a
- * benchmark. Per group: pool every usable row, take the generation median ask
- * price adjusted to the row's own odometer by a robust Theil-Sen km slope
- * (`benchmarkExpected`), then score the % deviation on the absolute rubric
- * (`dealScoreFromDeviation`).
- * Rows without a generation, rows failing `isClassifiable`, and every row of a
- * group below GENERATION_MIN_RATED usable rows are UNRATED (score 0, no
- * benchmark).
+ * Pure classification over grouped rows (no Nest, no DB).
+ * Groups rows by model + resolved generation, fits the property-based
+ * expected-price model once per pass, then scores each row's deviation from
+ * its leave-one-out expected price on the absolute rubric.
+ * Rows without a generation, rows failing `isClassifiable`, and rows whose
+ * group has fewer than EXPECTED_PRICE_MIN_COMPS kept comps (excluding the
+ * scored row) are UNRATED (score 0, no expected price).
  */
 export function classifyGroups(rows: ClassifierRow[]): ClassifyResult[] {
   const results = new Map<number, ClassifyResult>();
-  const groups = new Map<string, ClassifierRow[]>();
 
+  // Rows without a generation or failing isClassifiable are UNRATED outright.
+  const scorable: ClassifierRow[] = [];
   for (const r of rows) {
-    if (!r.generation) {
+    if (!r.generation || !isClassifiable(r)) {
       results.set(r.id, UNRATED_RESULT(r.id));
       continue;
     }
-    const key = groupKey(r);
-    const group = groups.get(key);
-    if (group) group.push(r);
-    else groups.set(key, [r]);
+    scorable.push(r);
   }
 
-  for (const group of groups.values()) {
-    const usable = group.filter(isClassifiable);
-    for (const r of group) {
-      if (!isClassifiable(r)) {
-        results.set(r.id, UNRATED_RESULT(r.id));
-      }
-    }
+  const expectedRows: ExpectedPriceRow[] = scorable.map((r) => ({
+    id: r.id,
+    model: r.model!,
+    generation: r.generation!,
+    price: r.priceNumeric!,
+    age: r.age ?? new Date().getFullYear() - r.year!,
+    km: r.mileageKm!,
+    powerKw: r.powerKw,
+    fuelType: r.fuelType,
+    transmission: r.transmission,
+  }));
 
-    if (usable.length < GENERATION_MIN_RATED) {
-      for (const r of usable) {
-        results.set(r.id, UNRATED_RESULT(r.id));
-      }
-      continue;
-    }
+  const predictions = computeExpectedPrices(expectedRows);
+  const byId = new Map(predictions.map((p) => [p.id, p]));
 
-    // Pool includes the row being scored: on thin groups its own ask pulls the
-    // median slightly, which is acceptable and keeps one pool per generation.
-    const pool = usable.map((r) => ({
-      price: r.priceNumeric!,
-      km: r.mileageKm!,
-    }));
-    for (const r of usable) {
-      const benchmark = benchmarkExpected(pool, r.mileageKm!);
+  for (const r of scorable) {
+    const pred = byId.get(r.id)!;
+    if (pred.expectedPrice === null) {
+      results.set(r.id, UNRATED_RESULT(r.id));
+    } else {
       results.set(
         r.id,
-        benchmark === null
-          ? UNRATED_RESULT(r.id)
-          : scoreRow(r.id, benchmark, r.priceNumeric!),
+        scoreRow(r.id, pred.expectedPrice, r.priceNumeric!, pred.sampleSize),
       );
     }
   }
@@ -182,24 +175,21 @@ export class DealClassifierService {
   constructor(private prismaService: PrismaService) {}
 
   /**
-   * Classify listings in the database (v2): model+generation comps —
-   * per-group median ask adjusted to each row's odometer by a Theil-Sen
-   * km slope, then % deviation → 5-tier label + 0-100 absolute score.
-   * When `limit` is given, only the `limit` most recently scraped listings
-   * are classified (useful for fast e2e smoke tests); otherwise all rows
-   * are re-labeled in place so stale labels from a previous pass are cleared.
+   * Classify all listings in the database: property-based expected price per
+   * row (group = model + resolved generation, fit once per pass), then % deviation
+   * → 5-tier label + 0-100 absolute score. Always re-labels every row in place
+   * so stale labels from a previous pass are cleared.
    * @returns Number of classified listings
    */
-  async classifyDeals(limit?: number): Promise<number> {
+  async classifyDeals(): Promise<number> {
     this.logger.log('Starting deal classification...');
 
-    // Fetch ALL listings by default: rows whose price turned non-numeric (e.g.
-    // "Price on request") must still be re-labeled in place — otherwise
-    // they keep a stale GREAT/GOOD label from a previous pass.
-    // With a limit, fetch only the most recently scraped `limit` rows.
+    // Fetch ALL listings ordered by id so classification is deterministic.
+    // Rows whose price turned non-numeric (e.g. "Price on request") must still
+    // be re-labeled in place — otherwise they keep a stale GREAT/GOOD label
+    // from a previous pass.
     const listings = await this.prismaService.listing.findMany({
-      take: limit,
-      orderBy: limit ? { scrapedAt: 'desc' } : undefined,
+      orderBy: { id: 'asc' },
     });
 
     if (listings.length === 0) {
@@ -216,6 +206,9 @@ export class DealClassifierService {
       year: l.year,
       age: l.age,
       mileageKm: l.mileageKm,
+      powerKw: l.powerKw,
+      fuelType: l.fuelType,
+      transmission: l.transmission,
       generation: resolveGeneration(l.model, l.year),
     }));
 
@@ -235,7 +228,7 @@ export class DealClassifierService {
     const unrated = results.filter((r) => r.dealType === 'UNRATED').length;
     this.logger.log(
       `Unrated ${unrated}/${results.length} listings ` +
-        `(unresolved generation, missing price/km/year, or generation below ${GENERATION_MIN_RATED} comps)`,
+        `(unresolved generation, missing price/km/year, or group below ${EXPECTED_PRICE_MIN_COMPS} comps excluding the row)`,
     );
 
     // One update per row; chunked so a 70k-row snapshot does not open 70k
@@ -251,6 +244,7 @@ export class DealClassifierService {
               dealScore: r.dealScore,
               expectedPrice: r.expectedPrice,
               deviationPct: r.deviationPct,
+              expectedPriceSampleSize: r.sampleSize,
               pricePerYear: pricePerYearById.get(r.id) ?? null,
             },
           }),

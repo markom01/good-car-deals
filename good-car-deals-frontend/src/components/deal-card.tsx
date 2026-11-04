@@ -72,23 +72,33 @@ export function DealCard({ deal }: { deal: Listing }) {
         )}
 
         {deal.deviationPct != null && deal.expectedPrice != null && (
-          <div className="flex items-center gap-2">
-            <Badge
-              variant={
-                deal.deviationPct > 0
-                  ? 'default'
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Badge
+                variant={
+                  deal.deviationPct > 0
+                    ? 'default'
+                    : deal.deviationPct < 0
+                      ? 'destructive'
+                      : 'ghost'
+                }
+              >
+                {deal.deviationPct > 0 ? '+' : ''}
+                {Math.round(deal.deviationPct)}%
+              </Badge>
+              <span className="text-muted-foreground text-xs">
+                {deal.deviationPct > 0
+                  ? 'below typical asking price'
                   : deal.deviationPct < 0
-                    ? 'destructive'
-                    : 'ghost'
-              }
-            >
-              {deal.deviationPct > 0 ? '+' : ''}
-              {Math.round(deal.deviationPct)}%
-            </Badge>
-            <span className="text-muted-foreground text-xs">
-              vs generation benchmark €{formatNumber(deal.expectedPrice)}{' '}
-              (mileage-adjusted)
-            </span>
+                    ? 'above typical asking price'
+                    : 'at typical asking price'}
+              </span>
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {deal.expectedPriceSampleSize != null
+                ? `€${formatNumber(deal.expectedPrice)} · based on ${deal.expectedPriceSampleSize} similar ads`
+                : `€${formatNumber(deal.expectedPrice)}`}
+            </p>
           </div>
         )}
 

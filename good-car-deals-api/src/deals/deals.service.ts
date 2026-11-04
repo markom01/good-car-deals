@@ -16,9 +16,9 @@ export class DealsService {
    * by the given sort option.
    *
    * `expectedPrice` and `deviationPct` are read straight from the row: the
-   * classifier already persisted the generation benchmark (mileage-adjusted
-   * per listing) and the deviation from it (positive = ask below benchmark).
-   * Display recomputes nothing, so the card always matches the stored score.
+   * classifier already persisted the property-based expected price and its
+   * comparable count. Display recomputes nothing, so the card always matches
+   * the stored score.
    *
    * `generation` is still resolved per row from the offline artifact for the
    * card description; a year ambiguous between two generations yields `null`.
