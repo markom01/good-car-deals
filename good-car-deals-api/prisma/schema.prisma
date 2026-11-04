@@ -29,6 +29,8 @@ model Listing {
   plateOrigin  String?  @map("plate_origin")
   expectedPrice Float?  @map("expected_price")
   deviationPct Float?   @map("deviation_pct")
+  /// Number of comparable listings behind expected_price, excluding this row.
+  expectedPriceSampleSize Int? @map("expected_price_sample_size")
   scrapedAt    DateTime @default(now()) @map("scraped_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

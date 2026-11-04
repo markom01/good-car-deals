@@ -78,13 +78,16 @@ describe('DealClassifierService.classifyDeals', () => {
     const count = await service.classifyDeals();
 
     expect(count).toBe(12);
+    // First fetch is deterministic: all rows ordered by id ascending.
+    expect(findMany).toHaveBeenNthCalledWith(1, { orderBy: { id: 'asc' } });
     // One update per row, batched (batch size 500 → one batch for 12 rows)
     expect(update).toHaveBeenCalledTimes(12);
-    // First update sets a rated dealType and a stored expected price.
+    // First update sets a rated dealType, a stored expected price, and comp count.
     const firstUpdate = update.mock.calls[0][0];
     expect(firstUpdate.where.id).toBe(BigInt(10));
     expect(firstUpdate.data.dealType).not.toBe('UNRATED');
     expect(firstUpdate.data.expectedPrice).not.toBeNull();
+    expect(firstUpdate.data.expectedPriceSampleSize).toBe(11);
   });
 
   it('marks every row UNRATED when pool is below 11 kept rows', async () => {
@@ -110,6 +113,7 @@ describe('DealClassifierService.classifyDeals', () => {
       expect(call[0].data.dealType).toBe('UNRATED');
       expect(call[0].data.dealScore).toBe(0);
       expect(call[0].data.expectedPrice).toBeNull();
+      expect(call[0].data.expectedPriceSampleSize).toBeNull();
     }
   });
 

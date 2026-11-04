@@ -35,6 +35,7 @@ export interface ListingWithDeal {
   location: string | null;
   expectedPrice: number | null;
   deviationPct: number | null;
+  expectedPriceSampleSize: number | null;
   scrapedAt: Date;
   updatedAt: Date;
 }
@@ -174,24 +175,21 @@ export class DealClassifierService {
   constructor(private prismaService: PrismaService) {}
 
   /**
-   * Classify listings in the database (v2): model+generation comps —
-   * per-group median ask adjusted to each row's odometer by a Theil-Sen
-   * km slope, then % deviation → 5-tier label + 0-100 absolute score.
-   * When `limit` is given, only the `limit` most recently scraped listings
-   * are classified (useful for fast e2e smoke tests); otherwise all rows
-   * are re-labeled in place so stale labels from a previous pass are cleared.
+   * Classify all listings in the database: property-based expected price per
+   * row (group = model + resolved generation, fit once per pass), then % deviation
+   * → 5-tier label + 0-100 absolute score. Always re-labels every row in place
+   * so stale labels from a previous pass are cleared.
    * @returns Number of classified listings
    */
-  async classifyDeals(limit?: number): Promise<number> {
+  async classifyDeals(): Promise<number> {
     this.logger.log('Starting deal classification...');
 
-    // Fetch ALL listings by default: rows whose price turned non-numeric (e.g.
-    // "Price on request") must still be re-labeled in place — otherwise
-    // they keep a stale GREAT/GOOD label from a previous pass.
-    // With a limit, fetch only the most recently scraped `limit` rows.
+    // Fetch ALL listings ordered by id so classification is deterministic.
+    // Rows whose price turned non-numeric (e.g. "Price on request") must still
+    // be re-labeled in place — otherwise they keep a stale GREAT/GOOD label
+    // from a previous pass.
     const listings = await this.prismaService.listing.findMany({
-      take: limit,
-      orderBy: limit ? { scrapedAt: 'desc' } : undefined,
+      orderBy: { id: 'asc' },
     });
 
     if (listings.length === 0) {
@@ -230,7 +228,7 @@ export class DealClassifierService {
     const unrated = results.filter((r) => r.dealType === 'UNRATED').length;
     this.logger.log(
       `Unrated ${unrated}/${results.length} listings ` +
-        `(unresolved generation, missing price/km/year, or group below ${EXPECTED_PRICE_MIN_COMPS} comps)`,
+        `(unresolved generation, missing price/km/year, or group below ${EXPECTED_PRICE_MIN_COMPS} comps excluding the row)`,
     );
 
     // One update per row; chunked so a 70k-row snapshot does not open 70k
@@ -246,6 +244,7 @@ export class DealClassifierService {
               dealScore: r.dealScore,
               expectedPrice: r.expectedPrice,
               deviationPct: r.deviationPct,
+              expectedPriceSampleSize: r.sampleSize,
               pricePerYear: pricePerYearById.get(r.id) ?? null,
             },
           }),
