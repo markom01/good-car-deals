@@ -82,6 +82,9 @@ describe('Full Flow E2E - Fresh Scrape → Save → Classify → Verify', () => 
 
     // Step 2b: Seed a deterministic 12-row comp group for the 10-comp gate.
     console.log('Step 2b: Seeding a deterministic 12-row comp group...');
+    await prismaService.listing.deleteMany({
+      where: { listingUrl: { startsWith: 'https://test.local/fixture/' } },
+    });
     await prismaService.listing.createMany({ data: fixtureRows() });
 
     // Step3: Classify deals (bounded to keep the e2e fast)
@@ -113,7 +116,7 @@ describe('Full Flow E2E - Fresh Scrape → Save → Classify → Verify', () => 
     // default 50-row page, then assert it got an expected price.
     const allDeals = (
       await request(app.getHttpServer()).get('/deals?pageSize=3000').expect(200)
-    ).body.data;
+    ).body as any[];
     const fixtureDeal = allDeals.find((d: any) =>
       d.listingUrl.endsWith('/fixture/0'),
     );
