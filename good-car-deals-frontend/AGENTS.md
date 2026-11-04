@@ -72,7 +72,6 @@ DealList is the only client boundary. Everything above stays as server component
 
 - **Accessibility**: No aria labels, no focus management, no keyboard nav beyond native elements.
 - **Streaming/ISR**: All data client-side; no Suspense streaming or ISR caching of /deals.
-- **Deeper test coverage**: Only DealCard is tested; DealList, useDeals hook, and the wheelrank page are untested.
 - **Monorepo sharing**: No shared UI components or design tokens across packages. Only the `Listing` type is shared.
 
 ## NOTES

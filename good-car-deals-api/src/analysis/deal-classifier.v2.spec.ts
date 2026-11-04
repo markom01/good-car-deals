@@ -24,7 +24,7 @@ function genRow(
     generation,
     priceNumeric: price,
     year,
-    age: 2026 - year,
+    age: new Date().getFullYear() - year,
     mileageKm: km,
     powerKw: 100,
     fuelType: 'Dizel',

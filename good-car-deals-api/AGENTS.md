@@ -14,9 +14,8 @@ src/
 ├── prisma/              # Prisma 7 service + module
 │   ├── prisma.service.ts       # Wraps PrismaClient
 │   └── prisma.module.ts
-├── scraper/             # HTTP client, HTML parser, cron
+├── scraper/             # HTTP client, cron
 │   ├── http.service.ts         # impit (Chrome TLS fingerprint), retries, page URL builder, proxy support
-│   ├── html-parser.service.ts  # cheerio, featured/regular listing parsing
 │   ├── scraper.service.ts      # Resumable page loop, dedup, upsert to DB, pagination-cap guard
 │   ├── cron.service.ts         # @Cron(EVERY_WEEK), orchestrates scrape→save→classify
 │   └── scraper.module.ts
@@ -42,7 +41,7 @@ src/
 
 ## SCRAPING PIPELINE
 
-1. **HttpService** — `impit` with Chrome TLS fingerprint. 3 retries with exponential backoff. Retries on timeout, 403, 503, network errors. `fetchPage` returns HTML, `fetchJson` returns parsed JSON; non-2xx throws `HttpError` with `status`. Supports optional `SCRAPER_PROXY_URL` for residential proxy.
+1. **HttpService** — `impit` with Chrome TLS fingerprint. 3 retries with exponential backoff. Retries on timeout, 403, 503, network errors. `fetchPage` returns HTML (used only for `__NEXT_DATA__` buildId discovery and listing liveness checks — not for listing data scraping), `fetchJson` returns parsed JSON from the site's Next.js data API; non-2xx throws `HttpError` with `status`. Supports optional `SCRAPER_PROXY_URL` for residential proxy.
 2. **ApiClientService** — primary data source. `fetchSearchPage(page)` calls the site's Next.js data endpoint `/_next/data/<buildId>/auto-oglasi/pretraga.json` (buildId read from `__NEXT_DATA__`, refreshed once on 404) with `pageSize=200` (the site maximum; 250 silently falls back to 25) and maps JSON results into `RawListingData`. The feed already returns only `status === 'active'` ads, so there is no per-ad detail call at all.
 3. **ScraperService** — Loops pages `start..min(pageCount, SCRAPER_MAX_PAGES)` (default cap 500) with 1s delay between requests. **Resumable**: `scrapeAndSaveResumable()` saves each page as it arrives, records `lastPage`/`pageCount` in the `scrape_progress` table after every page, and on the next run continues at `lastPage + 1` when the previous run was interrupted (`status = running`). A finished run (`status = done`) starts fresh. **Deep-pagination guard**: the site caps pagination at page 750 and re-serves page 1 past it, so a page that brings zero new `listingUrl`s aborts the run and marks `status = capped` instead of saving duplicates; at `pageSize=200` the whole ~70k catalogue fits under that cap. `SCRAPER_START_PAGE` seeds a fresh run when earlier pages already exist in the DB (e.g. filling a gap without refetching the rest). Stale rows (`scrapedAt < startedAt`) are deleted only after a complete, unseeded run. Deduplicates by `listingUrl` (`/auto-oglasi/<id>/<slug>`; the slug is generated from the title and canonicalised by the site — a URL without a slug renders the search page). Stores the feed's `brand` + `model` as a brand-scoped label ("Opel Astra") so comps never mix brands. 1 page failure doesn't stop the rest.
 4. **CronService** — `@Cron(CronExpression.EVERY_WEEK)`. Orchestrates scrape → save → classify. Errors don't crash the app, existing DB data preserved.
@@ -73,10 +72,30 @@ v4 property-based expected pricing in `deal-classifier.service.ts` + `expected-p
 ## TESTS
 
 - **Unit** — `*.spec.ts` co-located with source. Jest 30, ts-jest, `rootDir: src`.
-- **E2E** — `test/*.e2e-spec.ts` with Supertest. Config: `test/jest-e2e.json`.
-- **Setup** — `src/.jest/set-env.ts` loads test env vars before suite.
+- **E2E** — `test/*.e2e-spec.ts` with Supertest. Config: `test/jest-e2e.json`. E2E tests use a **separate test database** (`good_car_deals_e2e`) by default — they never touch the app database (`good_car_deals`).
+- **Setup** — `src/.jest/set-env.ts` loads test env vars before suite; defaults `TEST_DATABASE_URL` to the test database.
 
-Current test files: `app.controller.spec.ts`, `deal-classifier.v2.spec.ts`, `deal-classifier.service.spec.ts`, `deal-stats.spec.ts`, `expected-price.spec.ts`, `generation-resolver.spec.ts`, `deals.service.spec.ts`, `http.service.spec.ts`, `http.service.liveness.spec.ts`, `scraper.service.spec.ts`, `normalization.spec.ts`. E2E: `app.e2e-spec.ts`, `deals.e2e-spec.ts`, `e2e-qa.e2e-spec.ts`, `full-flow.e2e-spec.ts` (full-flow does LIVE scraping from the local IP).
+### Running E2E tests
+
+E2E tests require real data in the test database. Run them in this order:
+
+```bash
+# 1. Sync schema to test database (one-time, or after schema changes)
+TEST_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/good_car_deals_e2e?schema=public" npx prisma db push
+
+# 2. Populate test DB with real scraped data (1 page, local IP — ~200 listings)
+npx jest --config ./test/jest-e2e.json test/full-flow.e2e-spec.ts --runInBand
+
+# 3. Run all e2e tests against the populated test database
+npx jest --config ./test/jest-e2e.json --runInBand
+```
+
+- `full-flow.e2e-spec.ts` does LIVE scraping from `polovniautomobili.com` (local/residential IP only — cloud IPs get 403). It scrapes 1 page, saves, classifies, then verifies via `GET /deals`.
+- `deals.e2e-spec.ts` and `e2e-qa.e2e-spec.ts` read real data from the populated test DB — no seeded or mock data.
+- Use `--runInBand` so `full-flow` populates the DB before `deals`/`e2e-qa` read from it.
+- To override the test database, set `TEST_DATABASE_URL` in your shell before running.
+
+Current test files: `app.controller.spec.ts`, `deal-classifier.v2.spec.ts`, `deal-stats.spec.ts`, `generation-resolver.spec.ts`, `deals.service.spec.ts`, `http.service.spec.ts`, `http.service.liveness.spec.ts`, `scraper.service.spec.ts`, `normalization.spec.ts`. E2E: `app.e2e-spec.ts`, `deals.e2e-spec.ts`, `e2e-qa.e2e-spec.ts`, `full-flow.e2e-spec.ts`.
 
 ## GOTCHAS
 

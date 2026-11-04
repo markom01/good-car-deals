@@ -84,11 +84,13 @@ describe('DealsService.getDeals (stored generation benchmark)', () => {
         mainRows.filter((r) => gate?.in?.includes(r.dealType)),
       );
     });
+    const count = jest.fn(() => Promise.resolve(mainRows.length));
     return {
       service: new DealsService({
-        listing: { findMany },
+        listing: { findMany, count },
       } as unknown as PrismaService),
       findMany,
+      count,
     };
   };
 
@@ -97,10 +99,10 @@ describe('DealsService.getDeals (stored generation benchmark)', () => {
 
     const result = await service.getDeals();
 
-    const stilo2002 = result.find((r) => r.id === 1)!;
-    const stilo2003 = result.find((r) => r.id === 2)!;
-    const bmw = result.find((r) => r.id === 3)!;
-    const zafira = result.find((r) => r.id === 4)!;
+    const stilo2002 = result.data.find((r) => r.id === 1)!;
+    const stilo2003 = result.data.find((r) => r.id === 2)!;
+    const bmw = result.data.find((r) => r.id === 3)!;
+    const zafira = result.data.find((r) => r.id === 4)!;
 
     // Row-specific benchmarks: not flattened to one generation number.
     expect(stilo2002.expectedPrice).toBe(874.5);
@@ -120,7 +122,9 @@ describe('DealsService.getDeals (stored generation benchmark)', () => {
   it('no longer returns the removed recompute fields', async () => {
     const { service } = buildService();
 
-    const [first] = await service.getDeals();
+    const { data } = await service.getDeals();
+
+    const [first] = data;
 
     expect(first).not.toHaveProperty('generationAvgPriceNumeric');
     expect(first).not.toHaveProperty('generationMedianPriceNumeric');
@@ -132,9 +136,9 @@ describe('DealsService.getDeals (stored generation benchmark)', () => {
 
     const result = await service.getDeals();
 
-    expect(result.find((r) => r.id === 1)!.generation).toBe('Stilo');
-    expect(result.find((r) => r.id === 3)!.generation).toBeNull();
-    expect(result.find((r) => r.id === 4)!.generation).toBe('B');
+    expect(result.data.find((r) => r.id === 1)!.generation).toBe('Stilo');
+    expect(result.data.find((r) => r.id === 3)!.generation).toBeNull();
+    expect(result.data.find((r) => r.id === 4)!.generation).toBe('B');
   });
 
   it('queries the listings table once — no request-time pool scan', async () => {
@@ -150,7 +154,7 @@ describe('DealsService.getDeals (stored generation benchmark)', () => {
 
     const result = await service.getDeals();
 
-    expect(result.map((r) => r.id)).toEqual([1, 2, 3, 4]);
-    expect(result.every((r) => r.dealType !== null)).toBe(true);
+    expect(result.data.map((r) => r.id)).toEqual([1, 2, 3, 4]);
+    expect(result.data.every((r) => r.dealType !== null)).toBe(true);
   });
 });

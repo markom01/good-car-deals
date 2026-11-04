@@ -75,7 +75,7 @@ git add prisma/schema.prisma prisma/migrations && git commit -m "feat(db): deal 
 
 **Interfaces:**
 
-- Consumes: `RawListingData` already carries `fuelType, engineVolume, powerKw, transmission, location` as strings (`html-parser.service.ts:8`).
+- Consumes: `RawListingData` already carries `fuelType, engineVolume, powerKw, transmission, location` as strings (from `api-client.service.ts` feed mapping).
 - Produces: `parseEngineCc(engineVolume: string | null): number | null` (`"1956 cm3"` → `1956`), `parsePowerKw(powerKw: string | null): number | null` (`"81 kW"` → `81`), string fields stored trimmed (`fuelType`, `transmission`, `location`); `null` when unparsable/empty.
 
 - [ ] **Step 1: Write the failing tests** in `normalization.spec.ts`:

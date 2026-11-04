@@ -21,7 +21,7 @@ describe('E2E Test - Real Data Flow', () => {
   let app: INestApplication<App>;
 
   beforeAll(async () => {
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    const moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
@@ -39,19 +39,19 @@ describe('E2E Test - Real Data Flow', () => {
         .get('/deals')
         .expect(200);
 
-      expect(response.body).toBeDefined();
-      expect(Array.isArray(response.body)).toBe(true);
-      console.log(`\n  Returned ${response.body.length} listings`);
+      expect(response.body.data).toBeDefined();
+      expect(Array.isArray(response.body.data)).toBe(true);
+      console.log(`\n  Returned ${response.body.data.length} listings`);
 
       // Log sample listings
       console.log(`\n  Sample listings found:`);
-      for (const deal of response.body.slice(0, 5)) {
+      for (const deal of response.body.data.slice(0, 5)) {
         console.log(
           `    - ${deal.title} | ${deal.price} | ${deal.year}y | ${deal.mileageKm}km | ${deal.dealType}`,
         );
       }
-      if (response.body.length > 5) {
-        console.log(`    ... and ${response.body.length - 5} more`);
+      if (response.body.data.length > 5) {
+        console.log(`    ... and ${response.body.data.length - 5} more`);
       }
     });
 
@@ -60,7 +60,7 @@ describe('E2E Test - Real Data Flow', () => {
         .get('/deals')
         .expect(200);
 
-      const deal = response.body[0];
+      const deal = response.body.data[0];
 
       // Verify all required fields
       const requiredFields = [
@@ -88,7 +88,7 @@ describe('E2E Test - Real Data Flow', () => {
         .get('/deals?sort=pricePerYear')
         .expect(200);
 
-      const deals = response.body;
+      const deals = response.body.data;
 
       for (let i = 1; i < deals.length; i++) {
         const prev = deals[i - 1].pricePerYear;
@@ -107,7 +107,7 @@ describe('E2E Test - Real Data Flow', () => {
         .get('/deals')
         .expect(200);
 
-      const deals = response.body;
+      const deals = response.body.data;
 
       // Count deals with deal_type set
       const classifiedCount = deals.filter(
@@ -126,7 +126,7 @@ describe('E2E Test - Real Data Flow', () => {
         .get('/deals')
         .expect(200);
 
-      const deals = response.body;
+      const deals = response.body.data;
 
       for (const deal of deals) {
         expect(typeof deal).toBe('object');

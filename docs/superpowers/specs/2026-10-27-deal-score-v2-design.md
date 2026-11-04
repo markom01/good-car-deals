@@ -102,7 +102,7 @@ Ran the v2 math against the 363-row live `listings` table (spike: `/tmp/opencode
 - No changes to scraping targets/frequency; weekly cron untouched; startup/wipe behavior untouched.
 - BigInt·toJSON patch in `main.ts` covers new Float/Int columns naturally.
 - Render boot runs `prisma db push` — deployment adds the new columns safely; `.env` untouched.
-- Tests: extend `deal-classifier.service.spec.ts` (dev/score/bands/regression); `html-parser.service.spec.ts` already covers parsed fields; e2e `full-flow` assertions updated for new labels.
+- Tests: extend `deal-classifier.service.spec.ts` (dev/score/bands/regression); e2e `full-flow` assertions updated for new labels.
 
 ## Left to the builder
 

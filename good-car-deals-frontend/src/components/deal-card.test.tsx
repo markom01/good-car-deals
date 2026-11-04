@@ -68,7 +68,7 @@ describe('DealCard', () => {
 
   it('shows the typical asking price and comp count', () => {
     render(<DealCard deal={baseListing} />);
-    const badge = screen.getByText('+13%');
+    const badge = screen.getByText('13%');
     expect(badge).toHaveAttribute('data-variant', 'default');
     expect(screen.getByText(/below typical asking price/)).toBeInTheDocument();
     expect(

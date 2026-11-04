@@ -62,6 +62,8 @@ describe('ScraperService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Override .env SCRAPER_MAX_PAGES=1 so unit tests aren't capped at page 1.
+    process.env.SCRAPER_MAX_PAGES = '500';
     deleteMany.mockResolvedValue({ count: 0 });
     progressUpsert.mockResolvedValue({});
     progressUpdate.mockResolvedValue({});

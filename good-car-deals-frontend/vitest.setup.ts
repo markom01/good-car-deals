@@ -24,3 +24,17 @@ if (!('ResizeObserver' in globalThis)) {
     disconnect() {}
   } as unknown as typeof ResizeObserver;
 }
+
+if (!('IntersectionObserver' in globalThis)) {
+  globalThis.IntersectionObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+    root = null;
+    rootMargin = '';
+    thresholds = [];
+  } as unknown as typeof IntersectionObserver;
+}

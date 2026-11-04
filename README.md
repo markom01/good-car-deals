@@ -11,7 +11,7 @@ Scrapes classified car listings from [polovniautomobili.com](https://www.polovni
 | **Data Fetching** | TanStack React Query v5                                 |                                   |
 | **Backend**       | NestJS 11 (Express) + TypeScript                        | **Render** (free, spins down)     |
 | **Database**      | PostgreSQL via Prisma 7                                 | **Neon** (free, 0.5 GB)           |
-| **Scraping**      | impit (Firefox + HTTP/3) + cheerio (HTML)               | **Render** (built-in, no proxies) |
+| **Scraping**      | impit (Firefox + HTTP/3) + Next.js JSON data API        | **Render** (built-in, no proxies) |
 | **Monorepo**      | npm workspaces                                          |                                   |
 
 ## Project Structure

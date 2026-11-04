@@ -29,7 +29,9 @@ export class ScraperService {
    * last page the API reports or at the safety cap.
    * @returns Array of raw listing data (deduplicated by listingUrl)
    */
-  async scrapeTargetModel(): Promise<RawListingData[]> {
+  async scrapeTargetModel({
+    maxListings,
+  }: { maxListings?: number } = {}): Promise<RawListingData[]> {
     const allListings: RawListingData[] = [];
     let pageCount = 1;
     let successCount = 0;
@@ -47,6 +49,12 @@ export class ScraperService {
         pageCount = result.pageCount;
         allListings.push(...result.listings);
         successCount++;
+
+        // Early exit for bounded test runs: stop once we have enough unique
+        // listings instead of crawling the whole catalogue.
+        if (maxListings && allListings.length >= maxListings) {
+          break;
+        }
 
         // Small delay between pages to be polite
         if (page < Math.min(pageCount, this.maxPages)) {
@@ -148,7 +156,16 @@ export class ScraperService {
         );
 
         const result = await this.apiClientService.fetchSearchPage(page);
-        pageCount = result.pageCount;
+
+        // The feed sporadically serves an empty page whose pageCount collapses
+        // to 1 (a hole in the pagination, not the end of the catalogue):
+        // neighbouring pages still return results. Keep the page count already
+        // known and keep advancing; only a page 1 response may redefine it.
+        const emptyPageHole =
+          page > 1 && result.listings.length === 0 && result.pageCount === 1;
+        if (!emptyPageHole) {
+          pageCount = result.pageCount;
+        }
 
         // Deep-pagination guard: past its limit the site re-serves the first
         // page instead of returning an error, so "no new listings" means the

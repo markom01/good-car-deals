@@ -177,8 +177,8 @@ Mapping from API fields to the existing `RawListingData` contract:
 | `transmission` | `gearBox`                                                                        |
 | `location`     | `city`                                                                           |
 
-Everything the current `HtmlParserService` reconstructs from markup is a
-first-class field in the JSON. `cheerio` and the card heuristics become dead code.
+Everything the current `ApiClientService` extracts from JSON is a
+first-class field in the feed.
 
 ## Implemented
 

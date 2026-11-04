@@ -83,8 +83,8 @@ export function DealCard({ deal }: { deal: Listing }) {
                       : 'ghost'
                 }
               >
-                {deal.deviationPct > 0 ? '+' : ''}
-                {Math.round(deal.deviationPct)}%
+                {deal.deviationPct < 0 ? '-' : ''}
+                {Math.round(Math.abs(deal.deviationPct))}%
               </Badge>
               <span className="text-muted-foreground text-xs">
                 {deal.deviationPct > 0

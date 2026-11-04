@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   List,
   useDynamicRowHeight,
   type RowComponentProps,
 } from 'react-window';
-import type { Listing } from '@good-car-deals/shared';
+import type { DealsPage, Listing } from '@good-car-deals/shared';
 import { useDeals } from '@/hooks/use-deals';
 import { useColumns } from '@/hooks/use-columns';
 import { chunk } from '@/lib/chunk';
@@ -39,6 +39,35 @@ type DealRowProps = {
 };
 
 /**
+ * Shared loading skeleton rendered while deals are being fetched. Exported so
+ * the server component can reuse it as a Suspense fallback during streaming.
+ */
+export function DealListSkeleton() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <Card key={i}>
+          <CardHeader>
+            <CardTitle>
+              <Skeleton className="h-4 w-3/4" />
+            </CardTitle>
+            <CardDescription>
+              <Skeleton className="h-3 w-1/2" />
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-8 w-1/3" />
+          </CardContent>
+          <CardFooter>
+            <Skeleton className="h-10 w-full" />
+          </CardFooter>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+/**
  * One virtualized row: a CSS grid holding the same cards the old static grid
  * rendered. Rendered outside the component so react-window does not remount
  * it on every parent render.
@@ -68,11 +97,32 @@ function DealRow({
   );
 }
 
-export function DealList() {
-  const { data: deals, isLoading, isError, error, refetch } = useDeals();
+export function DealList({ page: initialPage }: { page?: DealsPage } = {}) {
+  const pageSize = initialPage?.pageSize ?? 50;
+  const [currentPage, setCurrentPage] = useState(initialPage?.page ?? 1);
+
+  // `initialData` was removed: the server component already pre-renders page 1
+  // (SSR), so the first paint shows deals immediately. On client-side page
+  // changes, React Query fetches fresh data for the new query key
+  // (['deals', page, pageSize]), so there's no stale-cache cross-talk between
+  // pages.
+  const {
+    data: dealsPage,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useDeals({
+    page: currentPage,
+    pageSize,
+  });
   const columns = useColumns();
 
-  const rows = useMemo(() => chunk(deals ?? [], columns), [deals, columns]);
+  const deals = dealsPage?.data ?? [];
+  const total = dealsPage?.total ?? 0;
+  const totalPages = Math.ceil(total / pageSize);
+
+  const rows = useMemo(() => chunk(deals, columns), [deals, columns]);
   const rowProps = useMemo(() => ({ rows, columns }), [rows, columns]);
 
   // Row heights vary: some cards carry a plate-origin row and a generation
@@ -86,6 +136,15 @@ export function DealList() {
     (index: number, data: DealRowProps) => data.rows[index][0]?.id ?? index,
     [],
   );
+
+  const goToPage = (next: number) => {
+    const clamped = Math.max(1, Math.min(next, totalPages || 1));
+    setCurrentPage(clamped);
+    // Changing currentPage changes the query key (['deals', page, pageSize]),
+    // so React Query auto-fetches the new page — no manual refetch needed.
+    // Calling refetch() here would use the stale page value and race against
+    // the new fetch, overwriting fresh data with the old page.
+  };
 
   // Loading state — show only on initial load (not background refetches)
   if (isLoading) {
@@ -130,7 +189,7 @@ export function DealList() {
   }
 
   // Empty state
-  if (deals && deals.length === 0) {
+  if (deals.length === 0) {
     return (
       <Empty>
         <EmptyTitle>No deals found</EmptyTitle>
@@ -142,18 +201,42 @@ export function DealList() {
     );
   }
 
-  // Row-virtualized grid: the page keeps scrolling normally (window scroller),
-  // only the rows near the viewport are mounted.
   return (
-    <List
-      rowComponent={DealRow}
-      rowProps={rowProps}
-      rowCount={rows.length}
-      rowHeight={rowHeight}
-      rowKey={rowKey}
-      scrollElement="window"
-      overscanCount={3}
-      defaultHeight={900}
-    />
+    <div className="space-y-6">
+      {/* Row-virtualized grid: the page keeps scrolling normally (window scroller),
+          only the rows near the viewport are mounted. */}
+      <List
+        rowComponent={DealRow}
+        rowProps={rowProps}
+        rowCount={rows.length}
+        rowHeight={rowHeight}
+        rowKey={rowKey}
+        scrollElement="window"
+        overscanCount={3}
+        defaultHeight={900}
+      />
+
+      {/* Pagination */}
+      <div className="flex items-center justify-between px-4">
+        <p className="text-sm text-muted-foreground">
+          Showing {deals.length} of {total} deals (page{' '}
+          <strong>{currentPage}</strong> of <strong>{totalPages || 1}</strong>)
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            Prev
+          </Button>
+          <Button
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage >= (totalPages || 1)}
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

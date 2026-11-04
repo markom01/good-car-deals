@@ -1,2 +1,2 @@
 export { DealCard } from './deal-card';
-export { DealList } from './deal-list';
+export { DealList, DealListSkeleton } from './deal-list';

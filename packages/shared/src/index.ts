@@ -35,3 +35,10 @@ export interface Listing {
   /** "Poreklo vozila": domestic plates vs foreign plates (import car). */
   plateOrigin?: PlateOrigin | null;
 }
+
+export interface DealsPage {
+  data: Listing[];
+  total: number;
+  page: number;
+  pageSize: number;
+}

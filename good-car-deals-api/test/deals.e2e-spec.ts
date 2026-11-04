@@ -47,13 +47,15 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
 
       // Verify we got real data
       expect(response.body).toBeDefined();
-      expect(Array.isArray(response.body)).toBe(true);
-      expect(response.body.length).toBeGreaterThan(0);
+      expect(Array.isArray(response.body.data)).toBe(true);
+      expect(response.body.data.length).toBeGreaterThan(0);
 
-      console.log(`  API returned ${response.body.length} real listings`);
+      console.log(
+        `  API returned ${response.body.data.length} real listings (total ${response.body.total})`,
+      );
 
       // Verify response contains expected fields from real DB
-      const firstDeal = response.body[0];
+      const firstDeal = response.body.data[0];
       expect(firstDeal).toHaveProperty('title');
       expect(firstDeal).toHaveProperty('price');
       expect(firstDeal).toHaveProperty('priceNumeric');
@@ -65,7 +67,7 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
         .get('/deals?sort=pricePerYear')
         .expect(200);
 
-      const deals = response.body;
+      const deals = response.body.data;
 
       // Verify real data is sorted by pricePerYear ascending
       for (let i = 1; i < deals.length; i++) {
@@ -86,7 +88,7 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
         .get('/deals')
         .expect(200);
 
-      const deals = response.body;
+      const deals = response.body.data;
 
       // Count deals by dealType from REAL classified data
       const dealTypes: Record<string, number> = {};
@@ -111,7 +113,7 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
         .get('/deals')
         .expect(200);
 
-      const deal = response.body[0];
+      const deal = response.body.data[0];
 
       // Verify all expected fields exist in REAL data
       expect(deal).toHaveProperty('id');
@@ -135,7 +137,7 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
         .get('/deals')
         .expect(200);
 
-      const deals = response.body;
+      const deals = response.body.data;
       for (let i = 1; i < deals.length; i++) {
         const prev = deals[i - 1].dealScore;
         const curr = deals[i].dealScore;
@@ -170,9 +172,11 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
         .get('/deals')
         .expect(200);
 
-      expect(response.body.length).toBe(count);
+      expect(response.body.total).toBe(count);
+      expect(response.body.data.length).toBeGreaterThan(0);
+      expect(response.body.data.length).toBeLessThanOrEqual(50);
       console.log(
-        `  DB has ${count} deals (GREAT/GOOD), API returned ${response.body.length}`,
+        `  DB has ${count} deals (GREAT/GOOD), API returned page of ${response.body.data.length}, total ${response.body.total}`,
       );
     });
 
@@ -182,10 +186,10 @@ describe('GET /deals (Integration Tests - REAL DATA)', () => {
         .expect(200);
 
       // Verify it's valid JSON
-      expect(Array.isArray(response.body)).toBe(true);
+      expect(Array.isArray(response.body.data)).toBe(true);
 
       // Verify each item is a proper object
-      for (const item of response.body) {
+      for (const item of response.body.data) {
         expect(typeof item).toBe('object');
         expect(item).not.toBeNull();
       }

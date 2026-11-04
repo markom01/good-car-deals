@@ -46,6 +46,10 @@ describe('ApiClientService', () => {
       providers: [
         ApiClientService,
         { provide: HttpService, useValue: { fetchPage, fetchJson } },
+        // scraper.targetUrl is the base search URL config — ApiClientService
+        // transforms it into the Next.js JSON API endpoint
+        // (_next/data/<buildId>/auto-oglasi/pretraga.json). It is NOT used
+        // for HTML scraping of listing data.
         {
           provide: ConfigService,
           useValue: {

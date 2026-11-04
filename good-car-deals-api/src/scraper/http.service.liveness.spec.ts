@@ -30,6 +30,9 @@ describe('HttpService - isListingLive (mocked redirects)', () => {
           provide: ConfigService,
           useValue: {
             get: (key: string) => {
+              // scraper.targetUrl is the base search URL config — ApiClientService
+              // transforms it into the Next.js JSON API endpoint. Not used for
+              // HTML scraping of listing data.
               if (key === 'scraper.targetUrl')
                 return 'https://www.polovniautomobili.com/auto-oglasi/pretraga';
               if (key === 'scraper.brand') return 'opel';
