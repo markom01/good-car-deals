@@ -52,12 +52,13 @@ function row(overrides = {}) {
 
 describe('computeExpectedPrices (property-based model)', () => {
   it('recovers a known age/km log-price surface (leave-one-out)', () => {
+    const kms = [
+      160_000, 50_000, 150_000, 60_000, 140_000, 70_000, 130_000, 80_000,
+      120_000, 90_000, 110_000, 100_000,
+    ];
     const fit = Array.from({ length: 12 }, (_, i) => {
       const age = i;
-      const km = [
-        160_000, 50_000, 150_000, 60_000, 140_000, 70_000, 130_000, 80_000,
-        120_000, 90_000, 110_000, 100_000,
-      ][i];
+      const km = kms[i];
       return row({
         id: i + 1,
         age,
@@ -102,6 +103,26 @@ describe('computeExpectedPrices (property-based model)', () => {
         (r) => r.expectedPrice === null && r.sampleSize === null,
       ),
     ).toBe(true);
+  });
+
+  it('trimms an outlier price via IQR when the group has 8+ fit rows', () => {
+    const fit = [
+      ...Array.from({ length: 11 }, (_, i) =>
+        row({ id: i + 1, age: 10, km: 100_000, price: 10_000 }),
+      ),
+      row({ id: 100, age: 10, km: 100_000, price: 1_000_000 }),
+    ];
+    const out = computeExpectedPrices(fit);
+    const flat = out.filter((r) => r.id !== 100);
+    for (const r of flat) {
+      expect(r.expectedPrice).not.toBeNull();
+      expect(r.expectedPrice).toBeCloseTo(10_000, 6);
+      expect(r.sampleSize).toBe(10);
+    }
+    const o = out.find((r) => r.id === 100);
+    expect(o.expectedPrice).not.toBeNull();
+    expect(o.expectedPrice).toBeCloseTo(10_000, 6);
+    expect(o.sampleSize).toBe(11);
   });
 
   it('clamps an extreme probe to the observed price band', () => {
@@ -169,6 +190,7 @@ describe('computeExpectedPrices (property-based model)', () => {
     ]);
     expect(lowPower.expectedPrice).not.toBeNull();
     expect(highPower.expectedPrice).not.toBeNull();
+    expect(lowPower.expectedPrice).toBeGreaterThan(0);
     expect(highPower.expectedPrice).toBeGreaterThan(
       lowPower.expectedPrice * 1.15,
     );
