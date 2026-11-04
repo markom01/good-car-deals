@@ -42,17 +42,17 @@ good car deals/
 
 ## WHERE TO LOOK
 
-| Task                | Location                                  | Notes                                          |
-| ------------------- | ----------------------------------------- | ---------------------------------------------- |
-| REST endpoints      | `good-car-deals-api/src/deals/`           | Controller + service                           |
-| Scraping logic      | `good-car-deals-api/src/scraper/`         | JSON API client (Next.js data + core API)      |
-| Deal classification | `good-car-deals-api/src/analysis/`        | `deal-classifier.service.ts` + `deal-stats.ts` |
-| DB schema           | `good-car-deals-api/prisma/schema.prisma` | Single `Listing` model, 4 secondary indexes    |
-| Frontend pages      | `good-car-deals-frontend/src/app/`        | App Router (layout, page, robots, sitemap)     |
-| UI components       | `good-car-deals-frontend/src/components/` | Custom + shadcn/ui primitives                  |
-| Shared types        | `packages/shared/src/index.ts`            | `Listing` interface                            |
-| Dev run             | Root `package.json` — `npm run dev`       | concurrently runs API + frontend               |
-| Startup behavior    | `good-car-deals-api/src/main.ts`          | `--scrape` flag, `SKIP_STARTUP_SCRAPE` env var |
+| Task                | Location                                  | Notes                                                                                                            |
+| ------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| REST endpoints      | `good-car-deals-api/src/deals/`           | Controller + service                                                                                             |
+| Scraping logic      | `good-car-deals-api/src/scraper/`         | JSON API client (Next.js data + core API)                                                                        |
+| Deal classification | `good-car-deals-api/src/analysis/`        | `deal-classifier.service.ts` + `expected-price.ts` (fit/predict math); `deal-stats.ts` keeps tier/score/IQR only |
+| DB schema           | `good-car-deals-api/prisma/schema.prisma` | Single `Listing` model, 4 secondary indexes                                                                      |
+| Frontend pages      | `good-car-deals-frontend/src/app/`        | App Router (layout, page, robots, sitemap)                                                                       |
+| UI components       | `good-car-deals-frontend/src/components/` | Custom + shadcn/ui primitives                                                                                    |
+| Shared types        | `packages/shared/src/index.ts`            | `Listing` interface                                                                                              |
+| Dev run             | Root `package.json` — `npm run dev`       | concurrently runs API + frontend                                                                                 |
+| Startup behavior    | `good-car-deals-api/src/main.ts`          | `--scrape` flag, `SKIP_STARTUP_SCRAPE` env var                                                                   |
 
 ## CONVENTIONS
 
@@ -63,12 +63,12 @@ good car deals/
 - **Data**: TanStack React Query v5 for client-side data fetching
 - **DB**: Prisma with PostgreSQL — `BigInt` IDs, snake_case column mapping via `@map()`
 - **Scraping**: `impit` transport → Next.js `/_next/data` search JSON feed only (`pageSize=200`, the site maximum); the per-ad detail API is no longer called — the feed already returns `status === 'active'` rows. The site caps deep pagination at **page 750** and re-serves page 1 past it, so `scrapeAndSaveResumable` aborts with `scrape_progress.status = 'capped'` when a page brings zero new URLs; `cheerio` parser kept only as legacy fallback
-- **Deal scoring**: v2 comps-relative — per-model log-price OLS/cell-median expected price (clamped to observed age/km + price band) → % deviation (capped ±50) → 5-tier badge + 0–100 score (`good-car-deals-api/src/analysis/deal-stats.ts`); model groups split into generation groups when the offline artifact resolves one generation with ≥10 usable rows (`generation-resolver.ts`; holdout sweep: MdAPE 10.04–10.06 at 6–10 comps vs 10.63 model-only and 10.30 at 40)
-- **Card benchmark**: `deals.service.ts` pools expected prices by resolved generation across **all years** of that generation (no year window) and requires ≥3 comps. `resolveGeneration` falls back to the **nearest generation** for boundary/gap years (e.g. Laguna 2001 → Mk2) so every resolvable model gets a benchmark; only models absent from the artifact show no average.
+- **Deal scoring**: v4 property-based — per model+generation log-price OLS with hierarchical intercepts (group→model→global, k=8), features age/km/power/fuel/transmission, leave-one-out prediction, gate 10 comps excluding the row, IQR trim at ≥8 fit rows, clamp to group feature/price bands, no range; `expectedPriceSampleSize` persisted per row (`good-car-deals-api/src/analysis/expected-price.ts`).
+- **Card benchmark**: `deals.service.ts` reads the property-based expected price and comp count straight from the row; thin groups (< 10 comps excluding the row) show no average.
 - **Residential proxy**: Optional — set `SCRAPER_PROXY_URL` env var if using a proxy service
 - **Monorepo**: npm workspaces, shared types package consumed from source (no build step)
 - **API security**: `helmet` on the Express app, `@nestjs/throttler` global guard (100 req/min per IP), optional `CORS_ORIGIN` allowlist (unset = allow all)
-- **Tests**: API = Jest 30 + ts-jest (97 unit + 15 e2e); Frontend = Vitest + Testing Library (DealCard)
+- **Tests**: API = Jest + ts-jest (108 unit); Frontend = Vitest + Testing Library (DealCard).
 
 ## KEY ENVIRONMENT VARIABLES
 
@@ -104,8 +104,8 @@ npm run start:dev -- --scrape   # or run via local scheduled task with --scrape 
 # API (good-car-deals-api/)
 npm run start:dev              # Watch mode
 npm run build                  # nest build
-npm run test                   # Jest unit tests (97)
-npm run test:e2e               # E2E tests (15)
+npm run test                   # Jest unit tests (108)
+npm run test:e2e               # E2E tests
 npm run lint                   # ESLint (no --fix)
 
 # Reclassify existing DB rows without scraping
