@@ -105,7 +105,7 @@ describe('computeExpectedPrices (property-based model)', () => {
     ).toBe(true);
   });
 
-  it('trimms an outlier price via IQR when the group has 8+ fit rows', () => {
+  it('trims an outlier price via IQR when the group has 8+ fit rows', () => {
     const fit = [
       ...Array.from({ length: 11 }, (_, i) =>
         row({ id: i + 1, age: 10, km: 100_000, price: 10_000 }),
