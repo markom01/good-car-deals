@@ -5,9 +5,9 @@ import { normalizePlateOrigin } from '../utils/normalization';
 import { resolveGeneration } from '../analysis/generation-resolver';
 import { DealSort } from './deals.controller';
 
-/** How long a listing counts as "new" after it was first saved (default 24h). */
+/** How long a listing counts as "new" after it was first saved (default 1h). */
 const NEW_LISTING_WINDOW_HOURS =
-  Number(process.env.NEW_LISTING_WINDOW_HOURS) || 24;
+  Number(process.env.NEW_LISTING_WINDOW_HOURS) || 1;
 const NEW_LISTING_WINDOW_MS = NEW_LISTING_WINDOW_HOURS * 3_600_000;
 
 @Injectable()

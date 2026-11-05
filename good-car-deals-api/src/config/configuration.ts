@@ -40,5 +40,5 @@ export default (): AppConfig => ({
     enabled: process.env.DEAL_WATCHER_ENABLED === 'true',
     pollIntervalMs: Number(process.env.DEAL_WATCHER_POLL_INTERVAL_MS ?? 600000),
   },
-  dealWatcherNewWindowHours: Number(process.env.NEW_LISTING_WINDOW_HOURS ?? 24),
+  dealWatcherNewWindowHours: Number(process.env.NEW_LISTING_WINDOW_HOURS ?? 1),
 });
