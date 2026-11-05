@@ -35,7 +35,10 @@ export function DealCard({ deal }: { deal: Listing }) {
   return (
     <Card className="min-w-[320px] max-w-md w-full">
       <CardHeader>
-        <CardTitle className="line-clamp-2">{deal.title}</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="line-clamp-2">{deal.title}</CardTitle>
+          {deal.isNew && <Badge variant="default">NEW</Badge>}
+        </div>
         <CardDescription>
           {deal.model ?? 'N/A'} &middot; {deal.year ?? 'N/A'} &middot;{' '}
           {formatNumber(deal.mileageKm)} km

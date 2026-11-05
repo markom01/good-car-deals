@@ -34,6 +34,8 @@ export interface Listing {
   location?: string | null;
   /** "Poreklo vozila": domestic plates vs foreign plates (import car). */
   plateOrigin?: PlateOrigin | null;
+  /** true when the listing was saved within NEW_LISTING_WINDOW_HOURS. */
+  isNew?: boolean;
 }
 
 export interface DealsPage {

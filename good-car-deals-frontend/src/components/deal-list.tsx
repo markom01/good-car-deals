@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   List,
   useDynamicRowHeight,
@@ -100,6 +100,7 @@ function DealRow({
 export function DealList({ page: initialPage }: { page?: DealsPage } = {}) {
   const pageSize = initialPage?.pageSize ?? 50;
   const [currentPage, setCurrentPage] = useState(initialPage?.page ?? 1);
+  const [viewMode, setViewMode] = useState<'all' | 'new'>('all');
 
   // `initialData` was removed: the server component already pre-renders page 1
   // (SSR), so the first paint shows deals immediately. On client-side page
@@ -115,6 +116,7 @@ export function DealList({ page: initialPage }: { page?: DealsPage } = {}) {
   } = useDeals({
     page: currentPage,
     pageSize,
+    isNew: viewMode === 'new',
   });
   const columns = useColumns();
 
@@ -137,6 +139,12 @@ export function DealList({ page: initialPage }: { page?: DealsPage } = {}) {
     [],
   );
 
+  // Switching view mode resets to page 1 — otherwise you can land on an empty
+  // page when "new" listings are fewer than `currentPage * pageSize`.
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [viewMode]);
+
   const goToPage = (next: number) => {
     const clamped = Math.max(1, Math.min(next, totalPages || 1));
     setCurrentPage(clamped);
@@ -144,6 +152,11 @@ export function DealList({ page: initialPage }: { page?: DealsPage } = {}) {
     // so React Query auto-fetches the new page — no manual refetch needed.
     // Calling refetch() here would use the stale page value and race against
     // the new fetch, overwriting fresh data with the old page.
+  };
+
+  const switchView = (mode: 'all' | 'new') => {
+    setViewMode(mode);
+    setCurrentPage(1);
   };
 
   // Loading state — show only on initial load (not background refetches)
@@ -203,6 +216,24 @@ export function DealList({ page: initialPage }: { page?: DealsPage } = {}) {
 
   return (
     <div className="space-y-6">
+      {/* All / New tabs */}
+      <div className="flex gap-2 px-4">
+        <Button
+          onClick={() => switchView('all')}
+          variant={viewMode === 'all' ? 'default' : 'outline'}
+          size="sm"
+        >
+          All ({total})
+        </Button>
+        <Button
+          onClick={() => switchView('new')}
+          variant={viewMode === 'new' ? 'default' : 'outline'}
+          size="sm"
+        >
+          New ({viewMode === 'new' ? deals.length : 0})
+        </Button>
+      </div>
+
       {/* Row-virtualized grid: the page keeps scrolling normally (window scroller),
           only the rows near the viewport are mounted. */}
       <List

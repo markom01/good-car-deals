@@ -5,6 +5,11 @@ import { normalizePlateOrigin } from '../utils/normalization';
 import { resolveGeneration } from '../analysis/generation-resolver';
 import { DealSort } from './deals.controller';
 
+/** How long a listing counts as "new" after it was first saved (default 24h). */
+const NEW_LISTING_WINDOW_HOURS =
+  Number(process.env.NEW_LISTING_WINDOW_HOURS) || 24;
+const NEW_LISTING_WINDOW_MS = NEW_LISTING_WINDOW_HOURS * 3_600_000;
+
 @Injectable()
 export class DealsService {
   private readonly logger = new Logger(DealsService.name);
@@ -32,9 +37,12 @@ export class DealsService {
     sort: DealSort = DealSort.SCORE,
     page: number = 1,
     pageSize: number = 50,
+    isNew: boolean = false,
   ): Promise<DealsPage> {
     this.logger.log(
-      `Fetching deals (GREAT/GOOD) sorted by ${sort}, page ${page}/${pageSize}`,
+      `Fetching deals (GREAT/GOOD) sorted by ${sort}, page ${page}/${pageSize}${
+        isNew ? ' (new only)' : ''
+      }`,
     );
 
     const skip = (page - 1) * pageSize;
@@ -44,7 +52,7 @@ export class DealsService {
         ? { pricePerYear: 'asc' as const }
         : [{ dealScore: 'desc' as const }, { pricePerYear: 'asc' as const }];
 
-    const where = {
+    const where: Record<string, unknown> = {
       dealType: { in: ['GREAT DEAL', 'GOOD DEAL'] },
       year: { not: null },
       title: { not: '' },
@@ -56,6 +64,11 @@ export class DealsService {
       OR: [{ plateOrigin: 'domestic' }, { plateOrigin: null }],
     };
 
+    if (isNew) {
+      const cutoff = new Date(Date.now() - NEW_LISTING_WINDOW_MS);
+      where.scrapedAt = { gte: cutoff };
+    }
+
     const [listings, total] = await Promise.all([
       this.prismaService.listing.findMany({
         where,
@@ -66,12 +79,15 @@ export class DealsService {
       this.prismaService.listing.count({ where }),
     ]);
 
+    const windowMs = isNew ? NEW_LISTING_WINDOW_MS : 0;
+
     return {
       data: listings.map((listing) => {
         const generation =
           listing.model !== null
             ? resolveGeneration(listing.model, listing.year)
             : null;
+        const scrapedAt = listing.scrapedAt;
 
         return {
           ...listing,
@@ -82,6 +98,9 @@ export class DealsService {
             listing.priceNumeric !== null ? Number(listing.priceNumeric) : null,
           generation,
           plateOrigin: normalizePlateOrigin(listing.plateOrigin),
+          isNew: isNew
+            ? scrapedAt >= new Date(Date.now() - windowMs)
+            : undefined,
         };
       }),
       total,

@@ -62,6 +62,11 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   DEAL_WATCHER_POLL_INTERVAL_MS?: string;
+
+  /** Hours a listing counts as "new" (optional — defaults 24). */
+  @IsOptional()
+  @IsString()
+  NEW_LISTING_WINDOW_HOURS?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

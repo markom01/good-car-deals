@@ -2,6 +2,7 @@ import {
   Controller,
   DefaultValuePipe,
   Get,
+  ParseBoolPipe,
   ParseEnumPipe,
   ParseIntPipe,
   Query,
@@ -36,9 +37,11 @@ export class DealsController {
       new ParseIntPipe(),
     )
     pageSize: number,
+    @Query('new', new DefaultValuePipe(false), new ParseBoolPipe())
+    isNew: boolean,
   ): Promise<DealsPage> {
     const safePage = Math.max(1, page);
     const safePageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, pageSize));
-    return this.dealsService.getDeals(sort, safePage, safePageSize);
+    return this.dealsService.getDeals(sort, safePage, safePageSize, isNew);
   }
 }
