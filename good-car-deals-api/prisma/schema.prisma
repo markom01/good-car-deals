@@ -65,10 +65,17 @@ model PushSubscription {
   @@map("push_subscriptions")
 }
 
-model SeenWillhabenAd {
+model SeenPolovniAd {
   id     String   @id
   seenAt DateTime @default(now()) @map("seen_at")
 
   @@index([seenAt])
-  @@map("seen_willhaben_ads")
+  @@map("seen_polovni_ads")
+}
+
+model ClassificationSnapshot {
+  id      DateTime @default(now()) @id
+  payload Json
+
+  @@map("classification_snapshots")
 }
