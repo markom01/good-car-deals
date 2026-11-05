@@ -123,8 +123,16 @@ describe('plateOriginFromTags', () => {
     );
   });
 
+  it('treats "Na ime kupca" as an unregistered import', () => {
+    // Detail pages show "Registrovan do: Nije registrovan" for these, even
+    // though the feed reports registrationInPrice=true.
+    expect(plateOriginFromTags(['Garancija', 'Na ime kupca'])).toBe('foreign');
+    expect(plateOriginFromTags(['Na ime kupca'], true)).toBe('foreign');
+    expect(plateOriginFromTags(['Na ime kupca'])).toBe('foreign');
+  });
+
   it('does not guess when the tag is absent', () => {
-    expect(plateOriginFromTags(['Garancija', 'Na ime kupca'])).toBeNull();
+    expect(plateOriginFromTags(['Garancija'])).toBeNull();
     expect(plateOriginFromTags([])).toBeNull();
     expect(plateOriginFromTags(undefined)).toBeNull();
   });

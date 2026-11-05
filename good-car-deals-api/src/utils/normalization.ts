@@ -175,15 +175,13 @@ export function plateOriginFromTags(
   tags?: string[] | null,
   registrationInPrice?: boolean,
 ): PlateOrigin | null {
-  if (!tags || tags.length === 0) {
-    // No tags at all — an unregistered import has no "Domaće tablice" tag and
-    // registrationInPrice=false. Treat as foreign so it gets filtered.
-    if (registrationInPrice === false) return 'foreign';
-    return null;
-  }
-  if (tags.includes('Strane tablice') || tags.includes('Nije registrovan'))
+  if (tags?.includes('Domaće tablice')) return 'domestic';
+  if (tags?.includes('Strane tablice') || tags?.includes('Nije registrovan'))
     return 'foreign';
-  if (tags.includes('Domaće tablice')) return 'domestic';
+  // "Na ime kupca" = dealer sells the car unregistered. The detail page shows
+  // "Nije registrovan" for these, while the feed's registrationInPrice flag is
+  // true anyway — the tag is the only reliable signal.
+  if (tags?.includes('Na ime kupca')) return 'foreign';
   // No domestic tag + registration not in price → unregistered import.
   if (registrationInPrice === false) return 'foreign';
   return null;
