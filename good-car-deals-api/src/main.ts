@@ -51,17 +51,31 @@ async function bootstrap() {
     if (process.argv.includes('--delete-leaks')) {
       console.log('Deleting pre-fix unregistered-import leaks...');
       const leakUrls = [
+        'https://www.polovniautomobili.com/auto-oglasi/20560520/ford-focus-16tdci',
         'https://www.polovniautomobili.com/auto-oglasi/30138875/peugeot-308-15-hdi',
         'https://www.polovniautomobili.com/auto-oglasi/30357876/audi-a3-quattro-dsg',
         'https://www.polovniautomobili.com/auto-oglasi/30707170/opel-mokka-cosmo-aut-kam',
         'https://www.polovniautomobili.com/auto-oglasi/30499878/volvo-xc60-moze-zamena',
         'https://www.polovniautomobili.com/auto-oglasi/30609246/peugeot-308-16ehdi-pano-top',
-        'https://www.polovniautomobili.com/auto-oglasi/30744938/volkswagen-golf-6-20-tdi-high-line',
-        'https://www.polovniautomobili.com/auto-oglasi/30745472/peugeot-2008-15-hdi-allure-nav',
-        'https://www.polovniautomobili.com/auto-oglasi/30745470/ford-kuga-20d-titanium-4wd',
-        'https://www.polovniautomobili.com/auto-oglasi/30745561/peugeot-3008',
-        'https://www.polovniautomobili.com/auto-oglasi/20560520/ford-focus-16tdci',
         'https://www.polovniautomobili.com/auto-oglasi/30745254/volkswagen-passat-b7-20tdi-dsg-holand',
+        'https://www.polovniautomobili.com/auto-oglasi/29953273/volkswagen-passat-b7-highline-4x4-dsg',
+        'https://www.polovniautomobili.com/auto-oglasi/30745561/peugeot-3008',
+        'https://www.polovniautomobili.com/auto-oglasi/30633122/volkswagen-golf-7-dsg-highline',
+        'https://www.polovniautomobili.com/auto-oglasi/30745491/peugeot-2008-12-allure-n-o-v',
+        'https://www.polovniautomobili.com/auto-oglasi/30377167/peugeot-308-16-hdi',
+        'https://www.polovniautomobili.com/auto-oglasi/30745560/peugeot-308',
+        'https://www.polovniautomobili.com/auto-oglasi/30744938/volkswagen-golf-6-20-tdi-high-line',
+        'https://www.polovniautomobili.com/auto-oglasi/30590188/nissan-qashqai-16-dci-tekna',
+        'https://www.polovniautomobili.com/auto-oglasi/28754552/peugeot-3008-perla',
+        'https://www.polovniautomobili.com/auto-oglasi/30260903/peugeot-3008-hdi-active',
+        'https://www.polovniautomobili.com/auto-oglasi/30745470/ford-kuga-20d-titanium-4wd',
+        'https://www.polovniautomobili.com/auto-oglasi/30057975/volvo-xc60-b5-awd-plus-dark-moze-zamena',
+        'https://www.polovniautomobili.com/auto-oglasi/30745465/peugeot-308-16hdi-excutive',
+        'https://www.polovniautomobili.com/auto-oglasi/29845343/volkswagen-golf-7-gtd',
+        'https://www.polovniautomobili.com/auto-oglasi/30497110/volkswagen-touran-16-tdi-dsg-match',
+        'https://www.polovniautomobili.com/auto-oglasi/30477671/peugeot-308-allure-aut',
+        'https://www.polovniautomobili.com/auto-oglasi/30745472/peugeot-2008-15-hdi-allure-nav',
+        'https://www.polovniautomobili.com/auto-oglasi/30305926/citroen-c3-aircross-12-shine-aut-moze-zamena',
       ];
       let n = 0;
       for (const url of leakUrls) {
