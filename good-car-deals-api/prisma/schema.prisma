@@ -32,6 +32,8 @@ model Listing {
   /// Number of comparable listings behind expected_price, excluding this row.
   expectedPriceSampleSize Int? @map("expected_price_sample_size")
   scrapedAt    DateTime @default(now()) @map("scraped_at")
+  /// When the site first indexed this ad (from the feed's indexedAt field).
+  indexedAt    DateTime?  @map("indexed_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@index([dealScore])

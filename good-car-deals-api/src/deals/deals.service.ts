@@ -66,7 +66,7 @@ export class DealsService {
 
     if (isNew) {
       const cutoff = new Date(Date.now() - NEW_LISTING_WINDOW_MS);
-      where.scrapedAt = { gte: cutoff };
+      where.indexedAt = { gte: cutoff };
     }
 
     const [listings, total] = await Promise.all([
@@ -87,19 +87,20 @@ export class DealsService {
           listing.model !== null
             ? resolveGeneration(listing.model, listing.year)
             : null;
-        const scrapedAt = listing.scrapedAt;
+        const indexedAt = listing.indexedAt;
 
         return {
           ...listing,
           id: Number(listing.id),
           scrapedAt: listing.scrapedAt.toISOString(),
+          indexedAt: listing.indexedAt ? listing.indexedAt.toISOString() : null,
           updatedAt: listing.updatedAt.toISOString(),
           priceNumeric:
             listing.priceNumeric !== null ? Number(listing.priceNumeric) : null,
           generation,
           plateOrigin: normalizePlateOrigin(listing.plateOrigin),
           isNew: isNew
-            ? scrapedAt >= new Date(Date.now() - windowMs)
+            ? !!indexedAt && indexedAt >= new Date(Date.now() - windowMs)
             : undefined,
         };
       }),

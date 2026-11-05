@@ -20,6 +20,8 @@ export interface RawListingData {
   location: string;
   /** "Poreklo vozila" derived from the feed tags. */
   plateOrigin?: 'domestic' | 'foreign' | null;
+  /** When the site first indexed this ad (from the feed's indexedAt field). */
+  indexedAt?: string | null;
 }
 
 export interface SearchResult {

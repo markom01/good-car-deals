@@ -194,6 +194,7 @@ export class ApiClientService {
       transmission: result.gearBox ?? '',
       location: result.city ?? '',
       plateOrigin: plateOriginFromTags(result.tags),
+      indexedAt: result.indexedAt ?? null,
     };
   }
 

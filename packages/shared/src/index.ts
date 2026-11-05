@@ -21,6 +21,8 @@ export interface Listing {
   pricePerYear: number | null;
   scrapedAt: string;
   updatedAt: string;
+  /** When the site first indexed this ad (from the feed's indexedAt field). */
+  indexedAt?: string | null;
   /** Typical asking price for a car with these properties, stored by the classifier. */
   expectedPrice: number | null;
   /** Ask vs expected price, stored by the classifier; positive = cheaper than typical. */
