@@ -57,6 +57,13 @@ const IDX_HYBRID = 5;
 const IDX_ELECTRIC = 6;
 const IDX_AUTO = 7;
 
+// Group key separator used in the serialized FitSnapshot (snapshot.groups keys).
+// The internal \u0000 separator works as an in-memory Map key but PostgreSQL
+// rejects U+0000 in text/JSON (error 22P05), so the snapshot stores keys with
+// this printable separator instead. Must match between buildFitSnapshot and
+// predictFromSnapshot.
+const GROUP_SEP = '::';
+
 export interface ExpectedPriceRow {
   id: number;
   model: string;
@@ -458,7 +465,7 @@ export function buildFitSnapshot(args: {
 
   const snapshotGroups: Record<string, GroupSnapshot> = {};
   for (const [key, g] of groupStats) {
-    snapshotGroups[key] = {
+    snapshotGroups[key.replace(/\u0000/g, GROUP_SEP)] = {
       count: g.count,
       sumResidual: g.sumResidual,
       model: g.model,
@@ -526,7 +533,7 @@ export function predictFromSnapshot(
 
   const out: ExpectedPriceResult[] = [];
   for (const r of predictRows) {
-    const key = `${r.model}\u0000${r.generation}`;
+    const key = `${r.model}${GROUP_SEP}${r.generation}`;
     const stats = snapshot.groups[key];
     if (!stats) {
       out.push({ id: r.id, expectedPrice: null, sampleSize: null });
