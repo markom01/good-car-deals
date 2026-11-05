@@ -165,11 +165,13 @@ describe('DealClassifierService.classifyDeals', () => {
 describe('DealClassifierService.scoreNewRows', () => {
   let service: DealClassifierService;
   const findFirst = jest.fn();
+  const update = jest.fn();
 
   beforeEach(async () => {
     findFirst.mockReset();
+    update.mockReset();
     const module = {
-      listing: { findMany: jest.fn(), update: jest.fn() },
+      listing: { findMany: jest.fn(), update },
       classificationSnapshot: { findFirst },
     } as unknown as PrismaService;
 
@@ -232,6 +234,18 @@ describe('DealClassifierService.scoreNewRows', () => {
 
     expect(results[0].expectedPrice).not.toBeNull();
     expect(results[0].dealType).not.toBe('UNRATED');
+
+    // The score must be written back at once: the watcher's "new" feed
+    // filters on deal_type, so an unsaved score never appears.
+    expect(update).toHaveBeenCalledTimes(1);
+    const persisted = update.mock.calls[0][0];
+    expect(persisted.where).toEqual({ id: 100n });
+    expect(persisted.data.dealType).toBe(results[0].dealType);
+    expect(persisted.data.dealScore).toBe(results[0].dealScore);
+    expect(persisted.data.expectedPrice).toBe(results[0].expectedPrice);
+    expect(persisted.data.pricePerYear).toBe(
+      service.calculatePricePerYear(9500, 2015),
+    );
 
     // deterministic across repeated polls
     const again = await service.scoreNewRows([row()]);

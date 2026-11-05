@@ -382,7 +382,48 @@ export class DealClassifierService {
         );
       }
     }
+
+    // Persist immediately: the watcher relies on deal_type to decide what
+    // shows in the "new" feed, so a computed-but-unsaved score is invisible.
+    await this.persistScores(rows, results);
+
     return results;
+  }
+
+  private async persistScores(
+    rows: ClassifierRow[],
+    results: ClassifyResult[],
+  ): Promise<void> {
+    const rowById = new Map(rows.map((row) => [row.id, row]));
+    try {
+      await Promise.all(
+        results.map((result) => {
+          const row = rowById.get(result.id);
+          const pricePerYear =
+            row && row.priceNumeric !== null && row.year !== null
+              ? this.calculatePricePerYear(row.priceNumeric, row.year)
+              : null;
+          return this.prismaService.listing.update({
+            where: { id: BigInt(result.id) },
+            data: {
+              dealType: result.dealType,
+              dealScore: result.dealScore,
+              expectedPrice: result.expectedPrice,
+              deviationPct: result.deviationPct,
+              expectedPriceSampleSize: result.sampleSize,
+              pricePerYear,
+            },
+          });
+        }),
+      );
+    } catch (error) {
+      // Scoring stays usable even if the write fails; the next full classify
+      // pass repairs the row.
+      this.logger.error(
+        'Failed to persist incremental classification',
+        error instanceof Error ? error : String(error),
+      );
+    }
   }
 
   /**
