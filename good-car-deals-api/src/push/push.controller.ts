@@ -43,7 +43,7 @@ export class PushController {
   async test() {
     await this.service.notifyNewAd({
       id: 'test',
-      title: 'Test push — willhaben watcher is working',
+      title: 'Test push — deal watcher is working',
       price: null,
       published: null,
       link: null,

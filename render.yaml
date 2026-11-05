@@ -24,10 +24,10 @@ services:
         value: '0 0 * * 0'
       - key: SKIP_STARTUP_SCRAPE
         value: 'true'
-      - key: WILLHABEN_ENABLED
+      - key: DEAL_WATCHER_ENABLED
         value: 'true'
-      - key: WILLHABEN_POLL_INTERVAL_MS
-        value: '5000'
+      - key: DEAL_WATCHER_POLL_INTERVAL_MS
+        value: '600000'
       - key: VAPID_PUBLIC_KEY
         value: 'BD5OuOzLU9inVkJlOLWC4uP6SiNXTEbO7XDKa2Gnj1B4gN5a-igOa6Tu32zgGpOIT9r80Hsuabr9Ko0Ba3EMbyE'
       - key: VAPID_PRIVATE_KEY

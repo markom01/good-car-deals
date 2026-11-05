@@ -17,6 +17,10 @@ import {
   EXPECTED_PRICE_MIN_COMPS,
 } from './expected-price';
 
+/** JSON value compatible with Prisma's `Json` column type. */
+type JsonValue =
+  string | number | boolean | { [key: string]: JsonValue | null } | JsonValue[];
+
 export interface ListingWithDeal {
   id: bigint;
   listingUrl: string;
@@ -279,16 +283,14 @@ export class DealClassifierService {
       .map((r) => r.deviationPct!)
       .filter((v): v is number => v !== null)
       .sort((a, b) => a - b);
+    const payload: JsonValue = buildFitSnapshot({
+      fitRows: snapshotFitRows,
+      scorePool,
+    }) as unknown as JsonValue;
     try {
       await this.prismaService.classificationSnapshot.deleteMany({});
       await this.prismaService.classificationSnapshot.create({
-        data: {
-          payload: JSON.parse(
-            JSON.stringify(
-              buildFitSnapshot({ fitRows: snapshotFitRows, scorePool }),
-            ),
-          ),
-        },
+        data: { payload },
       });
       this.logger.log('Persisted classification snapshot');
     } catch (error) {

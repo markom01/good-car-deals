@@ -48,15 +48,20 @@ export class EnvironmentVariables {
   @IsString()
   VAPID_EMAIL?: string;
 
-  /** Enable willhaben watcher polling (optional — defaults false). */
-  @IsOptional()
-  @IsString()
-  WILLHABEN_ENABLED?: string;
-
   /** Enable push delivery (optional — defaults false). */
   @IsOptional()
   @IsString()
   PUSH_ENABLED?: string;
+
+  /** Enable polovni deal watcher polling (optional — defaults false). */
+  @IsOptional()
+  @IsString()
+  DEAL_WATCHER_ENABLED?: string;
+
+  /** Poll interval ms for the deal watcher (optional — defaults 600000). */
+  @IsOptional()
+  @IsString()
+  DEAL_WATCHER_POLL_INTERVAL_MS?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

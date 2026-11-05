@@ -193,7 +193,7 @@ export function computeExpectedPrices(
   // ---- OLS over demeaned features -------------------------------------
   const means = featureMeans(allFit);
   const XTX = zeros(N_FEATURES, N_FEATURES);
-  const XTy = new Array(N_FEATURES).fill(0);
+  const XTy = new Array<number>(N_FEATURES).fill(0);
 
   for (const r of allFit) {
     const x = demean(r.x, means);
@@ -372,7 +372,7 @@ export function buildFitSnapshot(args: {
   // ---- OLS over demeaned features -------------------------------------
   const means = featureMeans(allFit);
   const XTX = zeros(N_FEATURES, N_FEATURES);
-  const XTy = new Array(N_FEATURES).fill(0);
+  const XTy = new Array<number>(N_FEATURES).fill(0);
 
   for (const r of allFit) {
     const x = demean(r.x, means);
@@ -545,8 +545,8 @@ export function predictFromSnapshot(
     if (wasKept) {
       const resid = residuals[String(r.id)] ?? 0;
       muLoo = (snapshot.globalSum - resid) / (snapshot.allFitCount - 1);
-      const mCount = snapshot.modelCount[stats.model]!;
-      const mSum = snapshot.modelSum[stats.model]!;
+      const mCount = snapshot.modelCount[stats.model];
+      const mSum = snapshot.modelSum[stats.model];
       modelBaseLoo =
         (mSum - resid + SHRINKAGE_K * muLoo) / (mCount - 1 + SHRINKAGE_K);
       groupBaseLoo =
@@ -692,7 +692,7 @@ function solve(A: number[][], b: number[]): number[] {
         pivotRow = row;
       }
     }
-    if (maxVal < 1e-12) return new Array(n).fill(0);
+    if (maxVal < 1e-12) return new Array<number>(n).fill(0);
     if (pivotRow !== col) [M[col], M[pivotRow]] = [M[pivotRow], M[col]];
 
     const piv = M[col][col];
@@ -702,7 +702,7 @@ function solve(A: number[][], b: number[]): number[] {
     }
   }
 
-  const x = new Array(n).fill(0);
+  const x: number[] = new Array<number>(n).fill(0);
   for (let i = n - 1; i >= 0; i--) {
     let s = M[i][n];
     for (let j = i + 1; j < n; j++) s -= M[i][j] * x[j];
