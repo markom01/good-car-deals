@@ -171,7 +171,11 @@ export function plateOriginFromTags(
   tags?: string[] | null,
 ): PlateOrigin | null {
   if (!tags || tags.length === 0) return null;
-  if (tags.includes('Strane tablice')) return 'foreign';
+  // "Nije registrovan" (unregistered) is an import without paperwork — its
+  // ask excludes Serbian duty, VAT and registration, same as foreign plates.
+  if (tags.includes('Strane tablice') || tags.includes('Nije registrovan')) {
+    return 'foreign';
+  }
   if (tags.includes('Domaće tablice')) return 'domestic';
   return null;
 }

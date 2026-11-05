@@ -117,6 +117,11 @@ describe('plateOriginFromTags', () => {
     expect(plateOriginFromTags(['Garancija', 'Strane tablice'])).toBe(
       'foreign',
     );
+    // "Nije registrovan" is an unregistered import — same price exclusion.
+    expect(plateOriginFromTags(['Nije registrovan'])).toBe('foreign');
+    expect(plateOriginFromTags(['Garancija', 'Nije registrovan'])).toBe(
+      'foreign',
+    );
   });
 
   it('does not guess when the tag is absent', () => {
