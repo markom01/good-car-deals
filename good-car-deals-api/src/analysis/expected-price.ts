@@ -75,6 +75,40 @@ export interface ExpectedPriceResult {
   sampleSize: number | null;
 }
 
+/**
+ * Persisted fit snapshot: everything `predictFromSnapshot` needs to reproduce
+ * `computeExpectedPrices` predictions for new rows without refitting.
+ * JSON-safe: all maps are plain objects, all sets are arrays.
+ */
+export interface GroupSnapshot {
+  count: number;
+  sumResidual: number;
+  model: string;
+  minPrice: number;
+  maxPrice: number;
+  minAge: number;
+  maxAge: number;
+  minKm: number;
+  maxKm: number;
+  minLnPower: number;
+  maxLnPower: number;
+  sumLnPower: number;
+}
+
+export interface FitSnapshot {
+  version: 1;
+  beta: number[];
+  means: FeatureMeans;
+  groups: Record<string, GroupSnapshot>;
+  globalSum: number;
+  allFitCount: number;
+  modelSum: Record<string, number>;
+  modelCount: Record<string, number>;
+  keptIds: number[];
+  residuals: Record<string, number>;
+  scorePool: number[];
+}
+
 interface GroupStats {
   count: number;
   sumResidual: number;
@@ -276,6 +310,252 @@ export function computeExpectedPrices(
 
     const x = predictVector(r, stats);
     let expected = Math.exp(groupBaseLoo + dot(beta, x));
+    expected = Math.min(expected, stats.maxPrice);
+    expected = Math.max(expected, stats.minPrice);
+    if (!Number.isFinite(expected) || expected <= 0) {
+      out.push({ id: r.id, expectedPrice: null, sampleSize: null });
+    } else {
+      out.push({ id: r.id, expectedPrice: expected, sampleSize: n });
+    }
+  }
+  return out;
+}
+
+/**
+ * Build a persisted fit snapshot from a fit pass: reuses the exact fit
+ * internals of `computeExpectedPrices` (OLS beta, feature means, per-group
+ * base terms and bands, LOO residual data) plus the classifier's score pool.
+ * Predicting from this snapshot reproduces `computeExpectedPrices` bit for
+ * bit on the same inputs.
+ */
+export function buildFitSnapshot(args: {
+  fitRows: ExpectedPriceRow[];
+  scorePool: number[];
+}): FitSnapshot {
+  const fit = [...args.fitRows].sort((a, b) => a.id - b.id);
+
+  // ---- group fit rows (identical to computeExpectedPrices) -------------
+  const groups = new Map<string, ExpectedPriceRow[]>();
+  for (const r of fit) {
+    const key = `${r.model}\u0000${r.generation}`;
+    const arr = groups.get(key);
+    if (arr) arr.push(r);
+    else groups.set(key, [r]);
+  }
+
+  const keptIds = new Set<number>();
+  const fitByGroup = new Map<string, FitRow[]>();
+
+  for (const [key, arr] of groups) {
+    const prices = arr.map((r) => r.price);
+    const trimmed = arr.length >= 8 ? iqrTrimmed(prices).kept : prices;
+    const keptSet = new Set(trimmed);
+
+    const fitRowsGroup: FitRow[] = [];
+    for (const r of arr) {
+      if (!keptSet.has(r.price)) continue; // trimmed out
+      if (r.powerKw == null || r.powerKw <= 0) continue;
+      if (!r.fuelType || !r.transmission) continue;
+      fitRowsGroup.push({
+        ...r,
+        groupKey: key,
+        x: featureVector(r),
+      });
+      keptIds.add(r.id);
+    }
+    fitByGroup.set(key, fitRowsGroup);
+  }
+
+  const allFit: FitRow[] = [];
+  for (const arr of fitByGroup.values()) allFit.push(...arr);
+
+  // ---- OLS over demeaned features -------------------------------------
+  const means = featureMeans(allFit);
+  const XTX = zeros(N_FEATURES, N_FEATURES);
+  const XTy = new Array(N_FEATURES).fill(0);
+
+  for (const r of allFit) {
+    const x = demean(r.x, means);
+    const yDev = Math.log(r.price) - means.y;
+    for (let i = 0; i < N_FEATURES; i++) {
+      for (let j = 0; j < N_FEATURES; j++) {
+        XTX[i][j] += x[i] * x[j];
+      }
+      XTy[i] += x[i] * yDev;
+    }
+  }
+
+  const maxDiag = Math.max(...XTX.map((row, i) => row[i]));
+  const ridge = 1e-8 * Math.max(1, maxDiag);
+  for (let i = 0; i < N_FEATURES; i++) XTX[i][i] += ridge;
+  const beta = solve(XTX, XTy);
+
+  const residualById = new Map<number, number>();
+  const groupStats = new Map<string, GroupStats>();
+  let globalSum = 0;
+  const modelSum = new Map<string, number>();
+  const modelCount = new Map<string, number>();
+
+  for (const r of allFit) {
+    const residual = Math.log(r.price) - dot(beta, r.x);
+    residualById.set(r.id, residual);
+    globalSum += residual;
+
+    const key = r.groupKey;
+    let g = groupStats.get(key);
+    if (!g) {
+      g = {
+        count: 0,
+        sumResidual: 0,
+        model: r.model,
+        minPrice: r.price,
+        maxPrice: r.price,
+        minAge: r.age,
+        maxAge: r.age,
+        minKm: r.km,
+        maxKm: r.km,
+        minLnPower: Math.log(r.powerKw!),
+        maxLnPower: Math.log(r.powerKw!),
+        sumLnPower: Math.log(r.powerKw!),
+      };
+      groupStats.set(key, g);
+    }
+    g.count++;
+    g.sumResidual += residual;
+    if (r.price < g.minPrice) g.minPrice = r.price;
+    if (r.price > g.maxPrice) g.maxPrice = r.price;
+    if (r.age < g.minAge) g.minAge = r.age;
+    if (r.age > g.maxAge) g.maxAge = r.age;
+    if (r.km < g.minKm) g.minKm = r.km;
+    if (r.km > g.maxKm) g.maxKm = r.km;
+    const lnPower = Math.log(r.powerKw!);
+    if (lnPower < g.minLnPower) g.minLnPower = lnPower;
+    if (lnPower > g.maxLnPower) g.maxLnPower = lnPower;
+    g.sumLnPower += lnPower;
+
+    const mSum = modelSum.get(r.model) ?? 0;
+    modelSum.set(r.model, mSum + residual);
+    modelCount.set(r.model, (modelCount.get(r.model) ?? 0) + 1);
+  }
+
+  const mu = allFit.length > 0 ? globalSum / allFit.length : 0;
+
+  const modelBase = new Map<string, number>();
+  for (const [model, count] of modelCount) {
+    modelBase.set(
+      model,
+      (modelSum.get(model)! + SHRINKAGE_K * mu) / (count + SHRINKAGE_K),
+    );
+  }
+  const groupBase = new Map<string, number>();
+  for (const [key, g] of groupStats) {
+    groupBase.set(
+      key,
+      (g.sumResidual + SHRINKAGE_K * modelBase.get(g.model)!) /
+        (g.count + SHRINKAGE_K),
+    );
+  }
+
+  const snapshotGroups: Record<string, GroupSnapshot> = {};
+  for (const [key, g] of groupStats) {
+    snapshotGroups[key] = {
+      count: g.count,
+      sumResidual: g.sumResidual,
+      model: g.model,
+      minPrice: g.minPrice,
+      maxPrice: g.maxPrice,
+      minAge: g.minAge,
+      maxAge: g.maxAge,
+      minKm: g.minKm,
+      maxKm: g.maxKm,
+      minLnPower: g.minLnPower,
+      maxLnPower: g.maxLnPower,
+      sumLnPower: g.sumLnPower,
+    };
+  }
+
+  return {
+    version: 1,
+    beta,
+    means,
+    groups: snapshotGroups,
+    globalSum,
+    allFitCount: allFit.length,
+    modelSum: Object.fromEntries(modelSum),
+    modelCount: Object.fromEntries(modelCount),
+    keptIds: [...keptIds],
+    residuals: Object.fromEntries(
+      [...residualById].map(([id, v]) => [String(id), v]),
+    ),
+    scorePool: args.scorePool,
+  };
+}
+
+/**
+ * Predict from a persisted snapshot: reproduces the predict phase of
+ * `computeExpectedPrices` exactly (leave-one-out adjustments, shrinkage,
+ * band clamps), so snapshot scoring matches the full-pass benchmark.
+ */
+export function predictFromSnapshot(
+  snapshot: FitSnapshot,
+  predictRows: ExpectedPriceRow[],
+): ExpectedPriceResult[] {
+  const SHRINKAGE_K = 8;
+  const mu =
+    snapshot.allFitCount > 0 ? snapshot.globalSum / snapshot.allFitCount : 0;
+
+  const modelBase = new Map<string, number>();
+  for (const [model, count] of Object.entries(snapshot.modelCount)) {
+    modelBase.set(
+      model,
+      (snapshot.modelSum[model] + SHRINKAGE_K * mu) / (count + SHRINKAGE_K),
+    );
+  }
+
+  const groupBase = new Map<string, number>();
+  for (const [key, g] of Object.entries(snapshot.groups)) {
+    const mb = modelBase.get(g.model)!;
+    groupBase.set(
+      key,
+      (g.sumResidual + SHRINKAGE_K * mb) / (g.count + SHRINKAGE_K),
+    );
+  }
+
+  const keptIds = new Set(snapshot.keptIds);
+  const residuals = snapshot.residuals;
+
+  const out: ExpectedPriceResult[] = [];
+  for (const r of predictRows) {
+    const key = `${r.model}\u0000${r.generation}`;
+    const stats = snapshot.groups[key];
+    if (!stats) {
+      out.push({ id: r.id, expectedPrice: null, sampleSize: null });
+      continue;
+    }
+    const wasKept = keptIds.has(r.id);
+    const n = stats.count - (wasKept ? 1 : 0);
+    if (n < EXPECTED_PRICE_MIN_COMPS) {
+      out.push({ id: r.id, expectedPrice: null, sampleSize: null });
+      continue;
+    }
+
+    let muLoo = mu;
+    let modelBaseLoo = modelBase.get(stats.model)!;
+    let groupBaseLoo = groupBase.get(key)!;
+    if (wasKept) {
+      const resid = residuals[String(r.id)] ?? 0;
+      muLoo = (snapshot.globalSum - resid) / (snapshot.allFitCount - 1);
+      const mCount = snapshot.modelCount[stats.model]!;
+      const mSum = snapshot.modelSum[stats.model]!;
+      modelBaseLoo =
+        (mSum - resid + SHRINKAGE_K * muLoo) / (mCount - 1 + SHRINKAGE_K);
+      groupBaseLoo =
+        (stats.sumResidual - resid + SHRINKAGE_K * modelBaseLoo) /
+        (stats.count - 1 + SHRINKAGE_K);
+    }
+
+    const x = predictVector(r, stats);
+    let expected = Math.exp(groupBaseLoo + dot(snapshot.beta, x));
     expected = Math.min(expected, stats.maxPrice);
     expected = Math.max(expected, stats.minPrice);
     if (!Number.isFinite(expected) || expected <= 0) {

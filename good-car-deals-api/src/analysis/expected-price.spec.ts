@@ -1,7 +1,10 @@
 import {
+  buildFitSnapshot,
   computeExpectedPrices,
   fuelCategory,
   isAutomatic,
+  predictFromSnapshot,
+  type ExpectedPriceRow,
 } from './expected-price';
 
 describe('fuelCategory', () => {
@@ -217,5 +220,42 @@ describe('computeExpectedPrices (property-based model)', () => {
       row({ id: i + 1, age: i, km: 50_000 + i * 10_000 }),
     );
     expect(computeExpectedPrices(fit)).toEqual(computeExpectedPrices(fit));
+  });
+});
+
+describe('fit snapshot (Task 3)', () => {
+  it('predictFromSnapshot matches computeExpectedPrices exactly on a held-out subset (1e-9)', () => {
+    const generations = ['Mk1', 'Mk2'];
+    const fit: ExpectedPriceRow[] = [];
+    let id = 1;
+    for (const gen of generations) {
+      for (let i = 0; i < 15; i++) {
+        fit.push({
+          id: id++,
+          model: 'Test Car',
+          generation: gen,
+          price: 8_000 + i * 400 + (gen === 'Mk2' ? 3_000 : 0),
+          age: 5 + i,
+          km: 60_000 + i * 8_000,
+          powerKw: 70 + i * 5,
+          fuelType: i % 3 === 0 ? 'Dizel' : 'Benzin',
+          transmission:
+            i % 2 === 0 ? 'Automatski 6 brzina' : 'Manuelni 5 brzina',
+        });
+      }
+    }
+
+    const full = computeExpectedPrices(fit);
+    const byId = new Map(full.map((p) => [p.id, p]));
+    const snapshot = buildFitSnapshot({ fitRows: fit, scorePool: [] });
+    const heldOut = fit.filter((_, i) => i % 3 === 0);
+    const predicted = predictFromSnapshot(snapshot, heldOut);
+
+    expect(predicted).toHaveLength(heldOut.length);
+    for (const p of predicted) {
+      const ref = byId.get(p.id)!;
+      expect(p.expectedPrice).toEqual(ref.expectedPrice);
+      expect(p.sampleSize).toEqual(ref.sampleSize);
+    }
   });
 });

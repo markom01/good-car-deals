@@ -9,8 +9,11 @@ import {
 } from './deal-stats';
 import { resolveGeneration } from './generation-resolver';
 import {
+  buildFitSnapshot,
   computeExpectedPrices,
+  predictFromSnapshot,
   type ExpectedPriceRow,
+  type FitSnapshot,
   EXPECTED_PRICE_MIN_COMPS,
 } from './expected-price';
 
@@ -255,6 +258,46 @@ export class DealClassifierService {
       );
     }
 
+    // Persist a fit snapshot so incremental rows can be scored without a refit.
+    // Fit on the same rows `classifyGroups` scored (classifiable, resolved
+    // generation) so the snapshot reproduces this pass exactly.
+    const snapshotFitRows = rows
+      .filter((r) => r.generation !== null && isClassifiable(r))
+      .map((r) => ({
+        id: r.id,
+        model: r.model!,
+        generation: r.generation!,
+        price: r.priceNumeric!,
+        age: r.age ?? new Date().getFullYear() - r.year!,
+        km: r.mileageKm!,
+        powerKw: r.powerKw,
+        fuelType: r.fuelType,
+        transmission: r.transmission,
+      }));
+    const scorePool = results
+      .filter((r) => r.dealType !== 'UNRATED')
+      .map((r) => r.deviationPct!)
+      .filter((v): v is number => v !== null)
+      .sort((a, b) => a - b);
+    try {
+      await this.prismaService.classificationSnapshot.deleteMany({});
+      await this.prismaService.classificationSnapshot.create({
+        data: {
+          payload: JSON.parse(
+            JSON.stringify(
+              buildFitSnapshot({ fitRows: snapshotFitRows, scorePool }),
+            ),
+          ),
+        },
+      });
+      this.logger.log('Persisted classification snapshot');
+    } catch (error) {
+      this.logger.error(
+        'Failed to persist classification snapshot',
+        error instanceof Error ? error : String(error),
+      );
+    }
+
     this.logger.log(
       `Classification complete. Classified ${results.length} listings`,
     );
@@ -267,6 +310,77 @@ export class DealClassifierService {
     );
 
     return results.length;
+  }
+
+  /**
+   * Score already-saved listings against the latest persisted fit snapshot,
+   * without refitting. One ClassifyResult per input row, in the same order.
+   * Rows stay UNRATED when no usable snapshot exists.
+   */
+  async scoreNewRows(rows: ClassifierRow[]): Promise<ClassifyResult[]> {
+    const latest = await this.prismaService.classificationSnapshot.findFirst({
+      orderBy: { id: 'desc' },
+    });
+
+    let snapshot: FitSnapshot | null = null;
+    if (latest?.payload) {
+      try {
+        snapshot = latest.payload as unknown as FitSnapshot;
+        if (
+          snapshot.version !== 1 ||
+          !Array.isArray(snapshot.beta) ||
+          typeof snapshot.groups !== 'object' ||
+          snapshot.groups === null ||
+          typeof snapshot.globalSum !== 'number'
+        ) {
+          throw new Error('malformed snapshot payload');
+        }
+      } catch (error) {
+        this.logger.warn(
+          'Classification snapshot is missing or malformed; new rows stay unclassified',
+          error,
+        );
+        snapshot = null;
+      }
+    }
+
+    if (!snapshot) {
+      this.logger.warn(
+        'No classification snapshot exists; new rows stay unclassified until classifyDeals runs',
+      );
+      return rows.map((r) => UNRATED_RESULT(r.id));
+    }
+
+    const results: ClassifyResult[] = [];
+    for (const r of rows) {
+      const generation = resolveGeneration(r.model, r.year);
+      if (!generation) {
+        results.push(UNRATED_RESULT(r.id));
+        continue;
+      }
+      const expectedRows: ExpectedPriceRow[] = [
+        {
+          id: r.id,
+          model: r.model!,
+          generation,
+          price: r.priceNumeric!,
+          age: r.age ?? new Date().getFullYear() - r.year!,
+          km: r.mileageKm!,
+          powerKw: r.powerKw,
+          fuelType: r.fuelType,
+          transmission: r.transmission,
+        },
+      ];
+      const [pred] = predictFromSnapshot(snapshot, expectedRows);
+      if (pred.expectedPrice === null) {
+        results.push(UNRATED_RESULT(r.id));
+      } else {
+        results.push(
+          scoreRow(r.id, pred.expectedPrice, r.priceNumeric!, pred.sampleSize),
+        );
+      }
+    }
+    return results;
   }
 
   /**
