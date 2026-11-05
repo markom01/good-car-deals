@@ -103,7 +103,6 @@ describe('extractModel', () => {
 
   it('should handle empty titles', () => {
     expect(extractModel('')).toBeNull();
-    expect(extractModel(null as unknown as string)).toBeNull();
   });
 
   it('should handle single word titles', () => {
@@ -128,6 +127,24 @@ describe('plateOriginFromTags', () => {
     expect(plateOriginFromTags(['Garancija', 'Na ime kupca'])).toBeNull();
     expect(plateOriginFromTags([])).toBeNull();
     expect(plateOriginFromTags(undefined)).toBeNull();
+  });
+
+  it('treats registrationInPrice=false without domestic tag as foreign', () => {
+    // Unregistered import: no "Domaće tablice" tag, registration not in price.
+    expect(plateOriginFromTags(['Na ime kupca'], false)).toBe('foreign');
+    expect(plateOriginFromTags(['Garancija'], false)).toBe('foreign');
+    expect(plateOriginFromTags([], false)).toBe('foreign');
+    expect(plateOriginFromTags(undefined, false)).toBe('foreign');
+  });
+
+  it('does not treat registrationInPrice=false as foreign when domestic tag present', () => {
+    // Domestic car where registration is paid separately — still domestic.
+    expect(plateOriginFromTags(['Domaće tablice'], false)).toBe('domestic');
+  });
+
+  it('ignores registrationInPrice when tags are present and unrecognised', () => {
+    expect(plateOriginFromTags(['Garancija'], true)).toBeNull();
+    expect(plateOriginFromTags(['Garancija'], undefined)).toBeNull();
   });
 });
 

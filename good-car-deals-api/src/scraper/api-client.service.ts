@@ -193,7 +193,7 @@ export class ApiClientService {
       powerKw: result.power ? String(result.power) : '',
       transmission: result.gearBox ?? '',
       location: result.city ?? '',
-      plateOrigin: plateOriginFromTags(result.tags),
+      plateOrigin: plateOriginFromTags(result.tags, result.registrationInPrice),
       indexedAt: result.indexedAt ?? null,
     };
   }

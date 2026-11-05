@@ -41,6 +41,8 @@ export interface SearchResult {
   tags?: string[];
   indexedAt?: string;
   updatedAt?: string;
+  /** Whether the advertised price includes registration. False = buyer pays separately. */
+  registrationInPrice?: boolean;
 }
 
 export interface FeedAd {

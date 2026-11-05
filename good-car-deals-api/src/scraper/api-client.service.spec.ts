@@ -93,6 +93,7 @@ describe('ApiClientService', () => {
       transmission: 'Manuelni 6 brzina',
       location: 'Novi Sad',
       plateOrigin: null,
+      indexedAt: null,
     });
   });
 

@@ -166,17 +166,26 @@ export function calculatePricePerYear(
  * Foreign-plated cars are imports: their ask excludes Serbian import duty,
  * VAT and registration, so their price is not comparable to a domestic car.
  * Unknown/absent tags stay null — never guess domestic.
+ *
+ * Unregistered imports ("Nije registrovan" on the detail page) are not tagged
+ * in the feed, but their `registrationInPrice` is false and they lack the
+ * "Domaće tablice" tag — the same price exclusion as foreign plates.
  */
 export function plateOriginFromTags(
   tags?: string[] | null,
+  registrationInPrice?: boolean,
 ): PlateOrigin | null {
-  if (!tags || tags.length === 0) return null;
-  // "Nije registrovan" (unregistered) is an import without paperwork — its
-  // ask excludes Serbian duty, VAT and registration, same as foreign plates.
-  if (tags.includes('Strane tablice') || tags.includes('Nije registrovan')) {
-    return 'foreign';
+  if (!tags || tags.length === 0) {
+    // No tags at all — an unregistered import has no "Domaće tablice" tag and
+    // registrationInPrice=false. Treat as foreign so it gets filtered.
+    if (registrationInPrice === false) return 'foreign';
+    return null;
   }
+  if (tags.includes('Strane tablice') || tags.includes('Nije registrovan'))
+    return 'foreign';
   if (tags.includes('Domaće tablice')) return 'domestic';
+  // No domestic tag + registration not in price → unregistered import.
+  if (registrationInPrice === false) return 'foreign';
   return null;
 }
 
