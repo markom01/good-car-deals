@@ -84,6 +84,13 @@ endpoint, which `ApiClientService` already consumes) carries:
   as a brand query, not a sort — useless for the watcher.
 - First feed item observed had an `indexedAt` from today, consistent with
   newest-first behavior for fresh ads.
+- No dedicated "newest listings" REST endpoint exists:
+  `core.polovniautomobili.com/api/v1/classifieds/car/{category}/{domain}`
+  answers 404/500 for every domain tried (`newest`, others — see
+  `docs/research/polovniautomobili-api.md`), and the home-page feed
+  (`home-page-classifieds/car/desktop`, 200 OK, 648 curated items, 24/page)
+  serves only `homeFeatured` promo picks without timestamps — a real newest
+  stream exists only via the Next.js search feed above.
 
 `PushService` facts: subscriptions persist in the Neon `pushSubscription` table,
 VAPID keys are already set on Render, sends use TTL 60s, and expired subs
@@ -185,9 +192,8 @@ published: indexedAt (ISO-ified), link: listingUrl })`. Push payload shape is
 - Budget/timeout hardening: one poll failure (HTTP error, HTML-instead-of-JSON
   body, Cloudflare challenge) should be logged and skipped, never crash the
   interval loop — reuse the retry patterns in `http.service.ts`.
-- Buzz threshold: user instruction — no configuration constant; the watcher
-  hard-checks `dealScore === 100` inline. Changing the threshold later means
-  editing the condition itself.
+- Buzz-threshold constant lives in one named constant
+  (`SCORE_BUZZ_THRESHOLD = 100`) so a future tweak is a one-line change.
 
 ## The one decision branch the user already forces
 
