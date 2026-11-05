@@ -71,9 +71,17 @@ endpoint, which `ApiClientService` already consumes) carries:
   don't declare these fields yet. Types get extended, not guessed around.
 - `updatedAt` = same string, changes on ad edits/bumps (ignored for newness).
 - `searchLiftedAt` for featured/lifted ads (ignored).
-- Default search page carries `"sort":"basic"`; no server-rendered sort-choice
-  list was found. Ordering tolerance therefore comes from the seen-set-by-ID
-  approach, not from trusting page order.
+- Default search page carries `"sort":"basic"` and silently 308-redirects any
+  invalid `sort` value back to `sort=basic` (verified against `sort=date`,
+  `sort=datum`, `sort=newest`, `sort=priceAsc`; `docs/research/polovniautomobili-api.md`
+  lists `sort=newest`, which the site no longer accepts). The full dropdown
+  enum was extracted from the site's JS bundle:
+  `basic`, `price_asc`, `price_desc`, `year_asc`, `year_desc`,
+  `mileage_asc`, `mileage_desc`, `title_asc`, `title_desc`,
+  `renew_date_asc`, `renew_date_desc`, `credit_installment_asc`,
+  `credit_installment_desc`, `leasing_installment_asc`,
+  `leasing_installment_desc`. The SEO path `/auto-oglasi/najnoviji` is parsed
+  as a brand query, not a sort — useless for the watcher.
 - First feed item observed had an `indexedAt` from today, consistent with
   newest-first behavior for fresh ads.
 
@@ -111,9 +119,19 @@ willhaben specifics are deleted. Wiring differences from the willhaben version:
   never mis-buzzed — while a crash before the old 30-min flush could never
   re-buzz because row-existence covers it either way.
 - **Feed fetch:** reuse `ApiClientService.fetchSearchPage(1)` (build id refresh,
-  impit, retry, proxy support). Page 1 only; ignore `pageCount` past 1. Extend
-  `SearchResult` with `id` and `indexedAt` (and note `updatedAt`) so the
+  impit, retry, proxy support). Page 1 only; ignore `pageCount` past 1.
+  Extend `SearchResult` with `id` and `indexedAt` (and note `updatedAt`) so the
   payload's built-in freshness data stops being throwaway.
+- **Newest-first ordering:** the watcher's feed URL appends the site's
+  newest-first sort, `&sort=renew_date_desc` (verified live: top-30 covers only
+  ~10 minutes of feed activity, and the ordering is pure newest-date desc up to
+  a couple of featured-ads pin positions; invalid sort names get silently
+  normalized back to `basic` by the site, so the constant must be spelled
+  exactly). With the site max `pageSize` of 200, page 1 therefore reaches back
+  ~65 minutes per pull against a 10-min poll interval — about 6× headroom, so
+  new ads cannot realistically scroll off page 1 between polls. The
+  seen-set + `listings` pre-check decides newness; ordering jitter from pinned
+  featured ads does not affect correctness, only which row appears first.
 - **Persist:** reuse `ScraperService.saveListings(listings)` for the subset
   that passes the newness pre-check. It upserts keyed on `listingUrl`.
 - **Classify (snapshot, not refit):** a poll-local refit on one model's comps
@@ -167,8 +185,9 @@ published: indexedAt (ISO-ified), link: listingUrl })`. Push payload shape is
 - Budget/timeout hardening: one poll failure (HTTP error, HTML-instead-of-JSON
   body, Cloudflare challenge) should be logged and skipped, never crash the
   interval loop — reuse the retry patterns in `http.service.ts`.
-- Buzz-threshold constant lives in one named constant
-  (`SCORE_BUZZ_THRESHOLD = 100`) so a future tweak is a one-line change.
+- Buzz threshold: user instruction — no configuration constant; the watcher
+  hard-checks `dealScore === 100` inline. Changing the threshold later means
+  editing the condition itself.
 
 ## The one decision branch the user already forces
 
@@ -197,6 +216,6 @@ architecture change needed to re-threshold.
 
 - At least one real score-100 buzz received while the watcher was alive.
 - Weekly scrape → classify full pass shows no listing classed score-100 later
-  than its watch-window arrival minus one poll + classify cycle (i.e., the
-  watcher is not systematically missing page-2 stragglers, which reach the
-  stock via the Sunday backfill anyway).
+  than its watch-window arrival minus one poll + classify cycle. With the
+  newest-first sort this should be a no-hit check; a hit would mean new ads are
+  scrolling past page 1 between polls, i.e. the poll interval needs to shrink.
