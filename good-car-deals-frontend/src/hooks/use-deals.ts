@@ -3,7 +3,7 @@ import {
   type QueryFunctionContext,
   type UseQueryOptions,
 } from '@tanstack/react-query';
-import type { DealsPage, Listing } from '@good-car-deals/shared';
+import type { DealsPage } from '@good-car-deals/shared';
 import { API_URL } from '@/lib/fetch-deals';
 
 async function fetchDeals({
@@ -59,6 +59,9 @@ export function useDeals({
     // Force a fresh fetch whenever the page changes — data is paginated, so
     // stale cache from a different page must never be shown.
     staleTime: 0,
+    // The watcher writes new deals continuously; keep the open tab in sync
+    // without a manual refresh. New deals matter most, so poll them faster.
+    refetchInterval: isNew ? 30_000 : 60_000,
     ...queryOptions,
   });
 }

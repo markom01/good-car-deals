@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Listing } from '@good-car-deals/shared';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -34,11 +34,14 @@ function createClient() {
   });
 }
 
-const wrapper =
-  (client: QueryClient) =>
-  ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={client}>{children}</QueryClientProvider>
-  );
+const wrapper = (client: QueryClient) => {
+  function QueryWrapper({ children }: { children: React.ReactNode }) {
+    return (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+  }
+  return QueryWrapper;
+};
 
 beforeEach(() => {
   mockFetch = vi.fn() as ReturnType<typeof vi.fn>;
@@ -90,13 +93,14 @@ describe('DealList', () => {
   });
 
   it('shows skeletons while loading', async () => {
-    // Delay the response so loading state is observable
-    let resolveFetch: (v: any) => void;
+    // Delay the response so loading state is observable. DealList issues two
+    // queries (active view + new-deal count), so resolve every pending call.
+    const resolvers: Array<(v: unknown) => void> = [];
     mockFetch.mockImplementation(
       () =>
         new Promise((r) => {
-          resolveFetch = r;
-        }) as any,
+          resolvers.push(r as (v: unknown) => void);
+        }) as unknown as Promise<Response>,
     );
 
     const client = createClient();
@@ -107,8 +111,11 @@ describe('DealList', () => {
       container.querySelectorAll('[data-slot="skeleton"]').length,
     ).toBeGreaterThan(0);
 
-    resolveFetch(
-      jsonResponse({ data: [listing(1)], total: 1, page: 1, pageSize: 3000 }),
+    await waitFor(() => expect(resolvers.length).toBeGreaterThan(0));
+    resolvers.forEach((resolve) =>
+      resolve(
+        jsonResponse({ data: [listing(1)], total: 1, page: 1, pageSize: 3000 }),
+      ),
     );
     await screen.findByText('Car 1');
   });
