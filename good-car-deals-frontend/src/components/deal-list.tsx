@@ -120,9 +120,18 @@ export function DealList({ page: initialPage }: { page?: DealsPage } = {}) {
   });
   const columns = useColumns();
 
+  // Separate query so the "New" tab always shows the correct count,
+  // even before the user clicks it for the first time.
+  const { data: newPage } = useDeals({
+    page: 1,
+    pageSize: 1,
+    isNew: true,
+  });
+
   const deals = dealsPage?.data ?? [];
   const total = dealsPage?.total ?? 0;
   const totalPages = Math.ceil(total / pageSize);
+  const newCount = newPage?.total ?? 0;
 
   const rows = useMemo(() => chunk(deals, columns), [deals, columns]);
   const rowProps = useMemo(() => ({ rows, columns }), [rows, columns]);
@@ -230,7 +239,7 @@ export function DealList({ page: initialPage }: { page?: DealsPage } = {}) {
           variant={viewMode === 'new' ? 'default' : 'outline'}
           size="sm"
         >
-          New ({viewMode === 'new' ? deals.length : 0})
+          New ({newCount})
         </Button>
       </div>
 
