@@ -37,6 +37,15 @@ export interface SearchResult {
   brand?: string;
   model?: string;
   tags?: string[];
+  indexedAt?: string;
+  updatedAt?: string;
+}
+
+export interface FeedAd {
+  adId: string;
+  indexedAt: string | null;
+  updatedAt: string | null;
+  raw: RawListingData;
 }
 
 export interface SearchPayload {

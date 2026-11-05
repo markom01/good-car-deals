@@ -168,4 +168,91 @@ describe('ApiClientService', () => {
     expect(fetchPage).toHaveBeenCalledTimes(1); // build id fetched after the 404
     expect(page.listings).toHaveLength(1);
   });
+
+  describe('fetchNewestAds', () => {
+    const feedPayload = (results: Record<string, unknown>[]) => ({
+      pageProps: { searchResults: { pageCount: 3, results } },
+    });
+
+    const third = (id: string) => ({
+      id,
+      title: `Opel Astra ${id}`,
+      brand: 'Opel',
+      model: 'Astra',
+      year: 2019,
+      mileage: 120000,
+      fuel: 'Dizel',
+      engineVolume: 1598,
+      power: 100,
+      gearBox: 'Manuelni 6 brzina',
+      price: 9000,
+      city: 'Beograd',
+      status: 'active',
+    });
+
+    it('requests sort=renew_date_desc and pageSize=200 and maps ads with ids/indexedAt', async () => {
+      fetchJson.mockResolvedValue(
+        feedPayload([
+          { ...third('301'), indexedAt: '2026-11-05T09:00:00Z' },
+          { ...third('302'), indexedAt: '2026-11-05T08:00:00Z' },
+          {
+            ...third('303'),
+            status: 'expired',
+            indexedAt: '2026-11-05T07:00:00Z',
+          },
+        ]),
+      );
+
+      const ads = await service.fetchNewestAds(1);
+
+      const url = fetchJson.mock.calls[0][0];
+      expect(url).toContain(
+        '/_next/data/build-TEST123/auto-oglasi/pretraga.json?',
+      );
+      expect(url).toContain('sort=renew_date_desc');
+      expect(url).toContain('pageSize=200');
+      expect(url).toContain('page=1');
+
+      expect(ads).toHaveLength(2);
+      expect(ads[0].adId).toBe('301');
+      expect(ads[0].indexedAt).toBe('2026-11-05T09:00:00Z');
+      expect(ads[0].updatedAt).toBeNull();
+      expect(ads[0].raw.listingUrl).toBe(
+        'https://www.polovniautomobili.com/auto-oglasi/301/opel-astra-301',
+      );
+      expect(ads[1].adId).toBe('302');
+    });
+
+    it('does not mutate the shared searchUrl between calls', async () => {
+      fetchJson.mockResolvedValue(feedPayload([third('301')]));
+
+      await service.fetchNewestAds(1);
+      await service.fetchNewestAds(2);
+      await service.fetchSearchPage(1);
+
+      const newestUrl = fetchJson.mock.calls[0][0];
+      const secondNewestUrl = fetchJson.mock.calls[1][0];
+      const scrapeUrl = fetchJson.mock.calls[2][0];
+
+      expect(newestUrl).toContain('sort=renew_date_desc');
+      expect(secondNewestUrl).toContain('sort=renew_date_desc');
+      expect(secondNewestUrl).toContain('page=2');
+      expect(scrapeUrl).toContain('sort=basic');
+      expect(scrapeUrl).not.toContain('sort=renew_date_desc');
+    });
+
+    it('deduplicates FeedAds by adId within a page', async () => {
+      fetchJson.mockResolvedValue(
+        feedPayload([
+          { ...third('301'), indexedAt: '2026-11-05T09:00:00Z' },
+          { ...third('301'), indexedAt: '2026-11-05T09:05:00Z' },
+          third('302'),
+        ]),
+      );
+
+      const ads = await service.fetchNewestAds(1);
+
+      expect(ads.map((ad) => ad.adId)).toEqual(['301', '302']);
+    });
+  });
 });

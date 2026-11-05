@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService, HttpError } from './http.service';
 import {
+  FeedAd,
   RawListingData,
   SearchPage,
   SearchPayload,
@@ -116,6 +117,39 @@ export class ApiClientService {
     }
 
     return `${url.origin}/_next/data/${buildId}${path}.json?${params.toString()}`;
+  }
+
+  /**
+   * Fetch one page of the newest-first feed (`sort=renew_date_desc`,
+   * `pageSize=200`) for the deal watcher. Builds the URL on a clone of
+   * `searchUrl` so the shared member is never mutated.
+   * @param page - Page number (1-based), defaults to 1.
+   */
+  async fetchNewestAds(page: number = 1): Promise<FeedAd[]> {
+    const url = new URL(this.searchUrl.toString());
+    url.searchParams.set('sort', 'renew_date_desc');
+    url.searchParams.set('pageSize', '200');
+
+    const payload = await this.fetchWithBuildRetry<SearchPayload>(() =>
+      this.dataUrlFrom(url.toString(), page),
+    );
+    const searchResults = payload.pageProps?.searchResults;
+    const results = searchResults?.results ?? [];
+
+    const seen = new Set<string>();
+    const ads: FeedAd[] = [];
+    for (const result of results) {
+      if (result.status !== 'active') continue;
+      if (!result.id || seen.has(String(result.id))) continue;
+      seen.add(String(result.id));
+      ads.push({
+        adId: String(result.id),
+        indexedAt: result.indexedAt ?? null,
+        updatedAt: result.updatedAt ?? null,
+        raw: this.toRawListing(result),
+      });
+    }
+    return ads;
   }
 
   /** buildId changes on every deploy; read it from the server-rendered page. */
