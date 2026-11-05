@@ -196,3 +196,64 @@ export function normalizePlateOrigin(
 ): PlateOrigin | null {
   return value === 'domestic' || value === 'foreign' ? value : null;
 }
+
+const FEED_TIME_ZONE = 'Europe/Belgrade';
+
+/**
+ * Feed timestamps are Europe/Belgrade wall-clock strings without an offset
+ * ("2026-11-05 19:25:03"). `new Date(value)` interprets those in the server's
+ * own time zone, so the same ad lands 1-2h off on UTC hosts like Render.
+ */
+export function parseFeedTimestamp(value?: string | null): Date | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const hasExplicitOffset = /(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(trimmed);
+
+  if (!hasExplicitOffset) {
+    const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(
+      trimmed,
+    );
+    if (match) {
+      const [, year, month, day, hour, minute, second] = match.map(Number);
+      const wallClockAsUtc = Date.UTC(
+        year,
+        month - 1,
+        day,
+        hour,
+        minute,
+        second,
+      );
+      // Two passes settle the offset on DST transition days.
+      let instant = wallClockAsUtc - zoneOffsetMs(new Date(wallClockAsUtc));
+      instant = wallClockAsUtc - zoneOffsetMs(new Date(instant));
+      return new Date(instant);
+    }
+  }
+
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function zoneOffsetMs(date: Date): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: FEED_TIME_ZONE,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes): number =>
+    Number(parts.find((part) => part.type === type)?.value);
+  const asUtc = Date.UTC(
+    get('year'),
+    get('month') - 1,
+    get('day'),
+    get('hour'),
+    get('minute'),
+    get('second'),
+  );
+  return asUtc - date.getTime();
+}

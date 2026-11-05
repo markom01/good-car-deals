@@ -6,6 +6,7 @@ import {
   normalizeMileage,
   normalizePrice,
   parseEngineCc,
+  parseFeedTimestamp,
   parsePowerKw,
 } from '../utils/normalization';
 import { Listing } from '@prisma/client';
@@ -331,7 +332,7 @@ export class ScraperService {
             transmission: raw.transmission?.trim() || null,
             location: raw.location?.trim() || null,
             plateOrigin: raw.plateOrigin ?? null,
-            indexedAt: raw.indexedAt ? new Date(raw.indexedAt) : null,
+            indexedAt: parseFeedTimestamp(raw.indexedAt),
             scrapedAt: new Date(),
             updatedAt: new Date(),
           },
@@ -351,7 +352,7 @@ export class ScraperService {
             transmission: raw.transmission?.trim() || null,
             location: raw.location?.trim() || null,
             plateOrigin: raw.plateOrigin ?? null,
-            indexedAt: raw.indexedAt ? new Date(raw.indexedAt) : null,
+            indexedAt: parseFeedTimestamp(raw.indexedAt),
           },
         });
 

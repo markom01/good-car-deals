@@ -6,6 +6,7 @@ import {
   parsePowerKw,
   plateOriginFromTags,
   normalizePlateOrigin,
+  parseFeedTimestamp,
 } from './normalization';
 
 // Test data (no external dependencies)
@@ -163,5 +164,29 @@ describe('normalizePlateOrigin', () => {
     expect(normalizePlateOrigin('strane')).toBeNull();
     expect(normalizePlateOrigin(null)).toBeNull();
     expect(normalizePlateOrigin(undefined)).toBeNull();
+  });
+});
+
+describe('parseFeedTimestamp', () => {
+  it('reads offset-less feed times as Europe/Belgrade wall clock', () => {
+    // Winter (CET, +01:00)
+    expect(parseFeedTimestamp('2026-11-05 19:25:03')?.toISOString()).toBe(
+      '2026-11-05T18:25:03.000Z',
+    );
+    // Summer (CEST, +02:00)
+    expect(parseFeedTimestamp('2026-07-15 12:00:00')?.toISOString()).toBe(
+      '2026-07-15T10:00:00.000Z',
+    );
+  });
+
+  it('keeps explicit offsets and rejects empty input', () => {
+    expect(parseFeedTimestamp('2026-11-05T19:25:03Z')?.toISOString()).toBe(
+      '2026-11-05T19:25:03.000Z',
+    );
+    expect(parseFeedTimestamp('2026-11-05T19:25:03+01:00')?.toISOString()).toBe(
+      '2026-11-05T18:25:03.000Z',
+    );
+    expect(parseFeedTimestamp(null)).toBeNull();
+    expect(parseFeedTimestamp('')).toBeNull();
   });
 });
