@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'https://good-car-deals-api.onrender.com';
 const VAPID_PUBLIC_KEY =
@@ -20,6 +18,12 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 async function doSubscribe(): Promise<void> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    console.error('Push not supported');
+    return;
+  }
+
+  await navigator.serviceWorker.register('/sw.js', { scope: '/' });
   const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.subscribe({
     userVisibleOnly: true,
@@ -43,40 +47,6 @@ async function doSubscribe(): Promise<void> {
  * Button is always visible - tap to enable notifications.
  */
 export function PushSubscribe() {
-  const [showButton, setShowButton] = useState(true);
-
-  useEffect(() => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
-
-    const detach = () => {};
-
-    const run = async () => {
-      await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-      const registration = await navigator.serviceWorker.ready;
-
-      if (Notification.permission === 'granted') {
-        await doSubscribe();
-        return;
-      }
-      if (Notification.permission === 'denied') return;
-
-      try {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          await doSubscribe();
-        }
-        // Button stays visible on 'default' or 'denied'
-      } catch {
-        // Permission request failed; button stays for tap
-      }
-    };
-
-    run().catch((err) => console.error('Push setup failed:', err));
-    return detach;
-  }, []);
-
-  if (!showButton) return null;
-
   return (
     <div
       data-pw-btn
