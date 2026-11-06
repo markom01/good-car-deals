@@ -24,6 +24,8 @@ services:
         value: '0 0 * * 0'
       - key: SKIP_STARTUP_SCRAPE
         value: 'true'
+      - key: DEAL_WATCHER_BUZZ_THRESHOLD
+        value: '50'
       - key: DEAL_WATCHER_ENABLED
         value: 'true'
       - key: DEAL_WATCHER_POLL_INTERVAL_MS
