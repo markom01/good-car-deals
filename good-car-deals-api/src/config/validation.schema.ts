@@ -67,6 +67,11 @@ export class EnvironmentVariables {
   @IsOptional()
   @IsString()
   NEW_LISTING_WINDOW_HOURS?: string;
+
+  /** Deal watcher buzz threshold score (optional — defaults 100). */
+  @IsOptional()
+  @IsString()
+  DEAL_WATCHER_BUZZ_THRESHOLD?: string;
 }
 
 export function validate(config: Record<string, unknown>) {

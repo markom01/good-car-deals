@@ -18,8 +18,6 @@ import { PushService } from '../push/push.service';
 const POLL_PAGE = 1;
 
 /** Buzz gate: only a brand-new listing with exactly this score is pushed. */
-export const SCORE_BUZZ_THRESHOLD = 100;
-
 function dedupeByAdId(ads: FeedAd[]): FeedAd[] {
   const seen = new Set<string>();
   const out: FeedAd[] = [];
@@ -39,6 +37,7 @@ export class DealWatcherService implements OnModuleInit, OnModuleDestroy {
   private pendingSeen: string[] = [];
   private readonly enabled: boolean;
   private readonly pollIntervalMs: number;
+  private readonly buzzThreshold: number;
 
   constructor(
     private readonly configService: ConfigService,
@@ -53,6 +52,9 @@ export class DealWatcherService implements OnModuleInit, OnModuleDestroy {
     this.pollIntervalMs =
       Number(this.configService.get<number>('dealWatcher.pollIntervalMs')) ||
       600_000;
+    this.buzzThreshold =
+      Number(this.configService.get<number>('dealWatcher.buzzThreshold')) ||
+      100;
   }
 
   async onModuleInit(): Promise<void> {
@@ -125,7 +127,7 @@ export class DealWatcherService implements OnModuleInit, OnModuleDestroy {
       for (let i = 0; i < saved.length; i++) {
         const result = classified[i];
         const listing = saved[i];
-        if (!result || result.dealScore !== SCORE_BUZZ_THRESHOLD) continue;
+        if (!result || result.dealScore !== this.buzzThreshold) continue;
         const ad = adByUrl.get(listing.listingUrl);
         if (!ad) continue;
         await this.pushService.notifyNewAd({
