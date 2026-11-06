@@ -9,7 +9,7 @@ import { fetchServerDeals } from '@/lib/fetch-deals';
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const dealsPage = await fetchServerDeals({ page: 1, pageSize: 3000 });
+  const dealsPage = await fetchServerDeals({ page: 1 });
 
   return (
     <main className="container mx-auto max-w-7xl px-4 py-8">
