@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'https://good-car-deals-api.onrender.com';
@@ -20,27 +20,44 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 /**
- * Headless push bootstrap: nothing is rendered. On mount it registers the
- * service worker and tries to ask for notification permission right away
- * (Chromium/Firefox allow this without a click). iOS Safari refuses to show
- * the prompt outside a user gesture, so when the automatic attempt fails the
- * request is re-run inside the first tap anywhere on the page instead.
- * Denied permission or a missing push API (iOS Safari outside the installed
- * Home-Screen app) stays silent.
+ * iPadOS reports a desktop Mac user agent, so the plain UA test misses it.
+ * `maxTouchPoints > 1` on a Mac UA is the established iPadOS tell.
+ */
+function isIosDevice(): boolean {
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+  );
+}
+
+/**
+ * Push bootstrap with platform-differentiated prompting. The component stays
+ * invisible on Chrome/Android/Firefox, where the notification prompt is
+ * requested automatically on mount (no UI). iOS Safari/WebKit refuses
+ * requestPermission() outside a user gesture, so iOS devices get the floating
+ * "Get notified" button back — tapping it is the gesture WebKit requires and
+ * clicking it requests permission synchronously (any preceding await would
+ * consume the gesture). Once permission is granted, subscribe() needs no
+ * gesture, so a granted-but-unsubscribed device resubscribes silently
+ * re-enabled on mount. Engines that reject the mount-time prompt without
+ * being iOS (macOS Safari) fall back to requesting on the first tap.
  */
 export function PushSubscribe() {
+  const [showIosButton, setShowIosButton] = useState(false);
+
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       return;
     }
 
     let cleanup: (() => void) | undefined;
+    const detach = () => {
+      cleanup?.();
+      cleanup = undefined;
+    };
 
     const subscribe = async () => {
       const registration = await navigator.serviceWorker.ready;
-      const existing = await registration.pushManager.getSubscription();
-      if (existing) return;
-
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(
@@ -58,16 +75,38 @@ export function PushSubscribe() {
       }
     };
 
-    const askOrWaitForGesture = async () => {
-      if (Notification.permission === 'denied') return;
+    const attachFirstTapListener = () => {
+      if (cleanup) return;
+      const onFirstTap = () => {
+        detach();
+        Notification.requestPermission()
+          .then((perm) => {
+            if (perm === 'granted') return subscribe();
+            return undefined;
+          })
+          .catch(() => undefined);
+      };
+      document.addEventListener('click', onFirstTap, true);
+      cleanup = () => document.removeEventListener('click', onFirstTap, true);
+    };
+
+    const run = async () => {
+      await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      const registration = await navigator.serviceWorker.ready;
+      if (await registration.pushManager.getSubscription()) return;
+
       if (Notification.permission === 'granted') {
         await subscribe();
         return;
       }
+      if (Notification.permission === 'denied') return;
 
-      // iOS requires requestPermission() to run inside a user gesture, so the
-      // bare call either throws or resolves 'default'. A failure now is not
-      // final: retry inside the first tap (a real gesture) instead.
+      if (isIosDevice()) {
+        setShowIosButton(true);
+        return;
+      }
+
+      // Non-Apple engines permit a load-time prompt without a gesture.
       try {
         const perm = await Notification.requestPermission();
         if (perm === 'granted') {
@@ -80,35 +119,41 @@ export function PushSubscribe() {
       }
     };
 
-    const attachFirstTapListener = () => {
-      if (cleanup) return;
-      const onFirstTap = () => {
-        detach();
+    run().catch((err) => console.error('Push setup failed:', err));
+    return () => detach();
+  }, []);
+
+  if (!showIosButton) return null;
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 24,
+        right: 24,
+        zIndex: 1000,
+        background: '#14b8a6',
+        color: '#ffffff',
+        padding: '12px 20px',
+        borderRadius: 32,
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: 14,
+        fontWeight: 600,
+        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+        cursor: 'pointer',
+      }}
+      onClick={() => {
+        // Must be the first await-free statement of the gesture handler.
         Notification.requestPermission()
           .then((perm) => {
             if (perm === 'granted') return subscribe();
             return undefined;
           })
-          .catch(() => undefined);
-      };
-      // Capture so nav taps of links that leave the page still have the
-      // gesture-attached prompt started before unloading.
-      document.addEventListener('click', onFirstTap, true);
-      cleanup = () => document.removeEventListener('click', onFirstTap, true);
-    };
-    const detach = () => {
-      cleanup?.();
-      cleanup = undefined;
-    };
-
-    const run = async () => {
-      await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-      await askOrWaitForGesture();
-    };
-
-    run().catch((err) => console.error('Push setup failed:', err));
-    return () => detach();
-  }, []);
-
-  return null;
+          .catch(() => undefined)
+          .finally(() => setShowIosButton(false));
+      }}
+    >
+      Get notified of new deals
+    </div>
+  );
 }
