@@ -17,6 +17,7 @@ export interface AppConfig {
   dealWatcher: {
     enabled: boolean;
     pollIntervalMs: number;
+    buzzThreshold: number;
   };
   dealWatcherNewWindowHours: number;
 }
