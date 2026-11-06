@@ -43,26 +43,89 @@ async function doSubscribe(): Promise<void> {
  * `maxTouchPoints > 1` on a Mac UA is the established iPadOS tell.
  */
 function isIosDevice(): boolean {
-  return (
+  if (
     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
-  );
+    (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 /**
- * Push bootstrap with platform-differentiated prompting. The component stays
- * invisible on Chrome/Android/Firefox, where the notification prompt is
- * requested automatically on mount (no UI). iOS Safari/WebKit refuses
- * requestPermission() outside a user gesture, so iOS devices always get the
- * floating "Get notified" button — tapping it is the gesture WebKit requires.
- * Once permission is granted, subscribe() needs no gesture, so a granted-but-
- * unsubscribed device resubscribes silently on mount.
+ * Push bootstrap with platform-differentiated prompting.
+ * iOS Safari/WebKit refuses requestPermission() outside a user gesture,
+ * so iOS devices always get the floating "Get notified" button.
+ * Chrome/Android/Firefox/macOS request permission automatically; button stays hidden.
  */
 export function PushSubscribe() {
-  // Show button: either iOS device (production) or dev mode (localhost)
-  const [showIosButton, setShowIosButton] = useState(
-    isIosDevice() || process.env.NODE_ENV === 'development',
-  );
+  // Determine at runtime (not build time)
+  const [showIosButton, setShowIosButton] = useState(() => isIosDevice());
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      return;
+    }
+
+    let cleanup: (() => void) | undefined;
+    const detach = () => {
+      cleanup?.();
+      cleanup = undefined;
+    };
+
+    const subscribeAndDone = async () => {
+      await doSubscribe();
+      setShowIosButton(false);
+    };
+
+    const attachFirstTapListener = () => {
+      if (cleanup) return;
+      const onFirstTap = () => {
+        detach();
+        Notification.requestPermission()
+          .then((perm) => {
+            if (perm === 'granted') return subscribeAndDone();
+            setShowIosButton(false);
+            return undefined;
+          })
+          .catch(() => {
+            setShowIosButton(false);
+            return undefined;
+          });
+      };
+      document.addEventListener('click', onFirstTap, true);
+      cleanup = () => document.removeEventListener('click', onFirstTap, true);
+    };
+
+    const run = async () => {
+      await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      const registration = await navigator.serviceWorker.ready;
+      if (await registration.pushManager.getSubscription()) return;
+
+      if (Notification.permission === 'granted') {
+        await subscribeAndDone();
+        return;
+      }
+      if (Notification.permission === 'denied') return;
+
+      // Non-Apple engines permit a load-time prompt without a gesture.
+      if (!isIosDevice()) {
+        try {
+          const perm = await Notification.requestPermission();
+          if (perm === 'granted') {
+            await subscribeAndDone();
+          } else {
+            attachFirstTapListener();
+          }
+        } catch {
+          attachFirstTapListener();
+        }
+      }
+    };
+
+    run().catch((err) => console.error('Push setup failed:', err));
+    return () => detach();
+  }, []);
 
   if (!showIosButton) return null;
 
@@ -87,11 +150,11 @@ export function PushSubscribe() {
       onClick={() => {
         Notification.requestPermission()
           .then((perm) => {
-            if (perm === 'granted') return doSubscribe();
+            if (perm === 'granted') return subscribeAndDone();
+            setShowIosButton(false);
             return undefined;
           })
-          .catch(() => undefined)
-          .finally(() => setShowIosButton(false));
+          .catch(() => setShowIosButton(false));
       }}
     >
       Get notified of new deals
