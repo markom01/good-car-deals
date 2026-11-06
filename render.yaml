@@ -5,7 +5,7 @@ services:
     region: frankfurt
     plan: free
     buildCommand: npm install && cd good-car-deals-api && npx prisma generate && npm run build
-    startCommand: cd good-car-deals-api && npx prisma db push --accept-data-loss && node dist/src/main.js --delete-leaks && node dist/src/main.js
+    startCommand: cd good-car-deals-api && npx prisma db push --accept-data-loss && node dist/src/main.js --delete-leaks && node dist/src/main.js --classify && node dist/src/main.js
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
