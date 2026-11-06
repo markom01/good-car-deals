@@ -57,73 +57,19 @@ function isIosDevice(): boolean {
  * "Get notified" button back — tapping it is the gesture WebKit requires.
  * Once permission is granted, subscribe() needs no gesture, so a granted-but-
  * unsubscribed device resubscribes silently on mount.
+ * DEBUG: force show iOS button locally for testing.
  */
 export function PushSubscribe() {
-  const [showIosButton, setShowIosButton] = useState(false);
-
-  useEffect(() => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      return;
-    }
-
-    let cleanup: (() => void) | undefined;
-    const detach = () => {
-      cleanup?.();
-      cleanup = undefined;
-    };
-
-    const attachFirstTapListener = () => {
-      if (cleanup) return;
-      const onFirstTap = () => {
-        detach();
-        Notification.requestPermission()
-          .then((perm) => {
-            if (perm === 'granted') return doSubscribe();
-            return undefined;
-          })
-          .catch(() => undefined);
-      };
-      document.addEventListener('click', onFirstTap, true);
-      cleanup = () => document.removeEventListener('click', onFirstTap, true);
-    };
-
-    const run = async () => {
-      await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-      const registration = await navigator.serviceWorker.ready;
-      if (await registration.pushManager.getSubscription()) return;
-
-      if (Notification.permission === 'granted') {
-        await doSubscribe();
-        return;
-      }
-      if (Notification.permission === 'denied') return;
-
-      if (isIosDevice()) {
-        setShowIosButton(true);
-        return;
-      }
-
-      // Non-Apple engines permit a load-time prompt without a gesture.
-      try {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          await doSubscribe();
-        } else {
-          attachFirstTapListener();
-        }
-      } catch {
-        attachFirstTapListener();
-      }
-    };
-
-    run().catch((err) => console.error('Push setup failed:', err));
-    return () => detach();
-  }, []);
+  // DEBUG: set to true to force-show the button locally
+  const [showIosButton, setShowIosButton] = useState(
+    process.env.NODE_ENV === 'development' ? true : false,
+  );
 
   if (!showIosButton) return null;
 
   return (
     <div
+      data-pw-btn
       style={{
         position: 'fixed',
         bottom: 24,
