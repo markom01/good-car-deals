@@ -127,7 +127,7 @@ export class DealWatcherService implements OnModuleInit, OnModuleDestroy {
       for (let i = 0; i < saved.length; i++) {
         const result = classified[i];
         const listing = saved[i];
-        if (!result || result.dealScore !== this.buzzThreshold) continue;
+        if (!result || result.dealScore < this.buzzThreshold) continue;
         const ad = adByUrl.get(listing.listingUrl);
         if (!ad) continue;
         await this.pushService.notifyNewAd({
