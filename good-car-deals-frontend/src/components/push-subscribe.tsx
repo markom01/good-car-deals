@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'https://good-car-deals-api.onrender.com';
@@ -39,98 +39,18 @@ async function doSubscribe(): Promise<void> {
 }
 
 /**
- * Push bootstrap with platform-optimized prompting.
- * - Chrome/Android/Firefox/macOS: auto-prompt on mount, button hidden after
- * - iOS Safari/Home Screen PWA: button visible, tap triggers prompt (gesture required)
+ * Push notification subscription component.
+ * Button is always visible - on tap it requests permission and subscribes.
  */
 export function PushSubscribe() {
-  // Start with button visible; hide only after grant or when we know auto-prompt worked
-  const [showButton, setShowButton] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      return;
-    }
+  useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
 
-    let clickHandler: (() => void) | undefined;
-
-    const detach = () => {
-      if (clickHandler) {
-        document.removeEventListener('click', clickHandler, true);
-        clickHandler = undefined;
-      }
-    };
-
-    const doSubscribeAndSetDismiss = async () => {
-      await doSubscribe();
-      setShowButton(false);
-    };
-
-    const tryAutoPrompt = async () => {
-      if (Notification.permission === 'granted') {
-        await doSubscribeAndSetDismiss();
-        return;
-      }
-      if (Notification.permission === 'denied') {
-        // Already denied, keep button hidden (or don't show it)
-        setShowButton(false);
-        return;
-      }
-
-      try {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          await doSubscribeAndSetDismiss();
-        } else if (perm === 'denied') {
-          setShowButton(false);
-        }
-        // If perm === 'default', button stays visible; user must tap
-      } catch {
-        // Permission request failed; button stays for tap handler
-      }
-    };
-
-    const startTapHandler = () => {
-      // On the first tap, try requesting permission (valid gesture context)
-      clickHandler = () => {
-        detach();
-        Notification.requestPermission()
-          .then((perm) => {
-            if (perm === 'granted') {
-              return doSubscribeAndSetDismiss();
-            }
-            // Denied or default - hide button, user may retry later
-            setShowButton(false);
-            return undefined;
-          })
-          .catch(() => setShowButton(false));
-      };
-      document.addEventListener('click', clickHandler, true);
-    };
-
-    const run = async () => {
-      await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-      const registration = await navigator.serviceWorker.ready;
-
-      // Already subscribed - dismiss button
-      if (await registration.pushManager.getSubscription()) {
-        setShowButton(false);
-        return;
-      }
-
-      await tryAutoPrompt();
-
-      // If button still visible and permission is 'default', we need a tap
-      if (showButton && Notification.permission === 'default') {
-        startTapHandler();
-      }
-    };
-
-    run().catch((err) => console.error('Push setup failed:', err));
-    return detach;
-  }, [showButton]);
-
-  if (!showButton) return null;
+  if (!mounted) return null;
 
   return (
     <div
@@ -150,16 +70,16 @@ export function PushSubscribe() {
         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
         cursor: 'pointer',
       }}
-      onClick={() => {
-        Notification.requestPermission()
-          .then((perm) => {
-            if (perm === 'granted') {
-              return doSubscribe().then(() => setShowButton(false));
-            }
-            setShowButton(false);
-            return undefined;
-          })
-          .catch(() => setShowButton(false));
+      onClick={async () => {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+          return;
+        }
+
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          await doSubscribe();
+        }
+        // Button stays visible - user can tap again if needed
       }}
     >
       Get notified of new deals
