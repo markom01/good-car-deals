@@ -138,7 +138,9 @@ export function PushSubscribe() {
       onClick={() => {
         Notification.requestPermission()
           .then((perm) => {
-            if (perm === 'granted') return subscribeAndDone();
+            if (perm === 'granted') {
+              return doSubscribe().then(() => setShowButton(false));
+            }
             setShowButton(false);
             return undefined;
           })
