@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'https://good-car-deals-api.onrender.com';
@@ -19,27 +19,30 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return bytes;
 }
 
+/**
+ * Headless push bootstrap: nothing is rendered. On mount, registers the
+ * service worker and — if push is supported — asks for notification
+ * permission as soon as the app starts, then sends the subscription to the
+ * API. Denied permission or a missing push API (iOS Safari before the app is
+ * installed) stays silent and retries nothing.
+ */
 export function PushSubscribe() {
-  const [status, setStatus] = useState<
-    'idle' | 'subscribing' | 'subscribed' | 'error'
-  >('idle');
-
-  const subscribe = async () => {
+  useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-      setStatus('error');
       return;
     }
 
-    try {
-      setStatus('subscribing');
-
+    const run = async () => {
       await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       const registration = await navigator.serviceWorker.ready;
 
       const existing = await registration.pushManager.getSubscription();
-      if (existing) {
-        setStatus('subscribed');
-        return;
+      if (existing) return;
+
+      if (Notification.permission === 'denied') return;
+      if (Notification.permission !== 'granted') {
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') return;
       }
 
       const subscription = await registration.pushManager.subscribe({
@@ -54,43 +57,13 @@ export function PushSubscribe() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(subscription),
       });
-
       if (!res.ok) {
-        throw new Error(`subscribe failed: ${res.status}`);
+        console.error('Push subscribe failed:', res.status);
       }
+    };
 
-      setStatus('subscribed');
-    } catch (err) {
-      console.error('Push subscription failed:', err);
-      setStatus('error');
-    }
-  };
+    run().catch((err) => console.error('Push setup failed:', err));
+  }, []);
 
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        bottom: 24,
-        right: 24,
-        zIndex: 1000,
-        background: '#14b8a6',
-        color: '#ffffff',
-        padding: '12px 20px',
-        borderRadius: 32,
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: 14,
-        fontWeight: 600,
-        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-        cursor: status === 'subscribing' ? 'not-allowed' : 'pointer',
-        opacity: status === 'subscribed' ? 0.6 : 1,
-      }}
-      onClick={subscribe}
-    >
-      {status === 'subscribing'
-        ? 'Activating notifications...'
-        : status === 'subscribed'
-          ? 'Notifications active ✓'
-          : 'Get notified of new deals'}
-    </div>
-  );
+  return null;
 }
