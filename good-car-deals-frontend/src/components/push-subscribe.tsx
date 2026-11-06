@@ -53,16 +53,15 @@ function isIosDevice(): boolean {
  * Push bootstrap with platform-differentiated prompting. The component stays
  * invisible on Chrome/Android/Firefox, where the notification prompt is
  * requested automatically on mount (no UI). iOS Safari/WebKit refuses
- * requestPermission() outside a user gesture, so iOS devices get the floating
- * "Get notified" button back — tapping it is the gesture WebKit requires.
+ * requestPermission() outside a user gesture, so iOS devices always get the
+ * floating "Get notified" button — tapping it is the gesture WebKit requires.
  * Once permission is granted, subscribe() needs no gesture, so a granted-but-
  * unsubscribed device resubscribes silently on mount.
- * DEBUG: force show iOS button locally for testing.
  */
 export function PushSubscribe() {
-  // DEBUG: set to true to force-show the button locally
+  // Show button: either iOS device (production) or dev mode (localhost)
   const [showIosButton, setShowIosButton] = useState(
-    process.env.NODE_ENV === 'development' ? true : false,
+    isIosDevice() || process.env.NODE_ENV === 'development',
   );
 
   if (!showIosButton) return null;
