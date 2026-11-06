@@ -39,28 +39,14 @@ async function doSubscribe(): Promise<void> {
 }
 
 /**
- * iPadOS reports a desktop Mac user agent, so the plain UA test misses it.
- * `maxTouchPoints > 1` on a Mac UA is the established iPadOS tell.
- */
-function isIosDevice(): boolean {
-  if (
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent))
-  ) {
-    return true;
-  }
-  return false;
-}
-
-/**
  * Push bootstrap with platform-differentiated prompting.
  * iOS Safari/WebKit refuses requestPermission() outside a user gesture,
  * so iOS devices always get the floating "Get notified" button.
  * Chrome/Android/Firefox/macOS request permission automatically; button stays hidden.
  */
 export function PushSubscribe() {
-  // Determine at runtime (not build time)
-  const [showIosButton, setShowIosButton] = useState(() => isIosDevice());
+  // State determines if button should be visible
+  const [showButton, setShowButton] = useState(true);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -75,21 +61,21 @@ export function PushSubscribe() {
 
     const subscribeAndDone = async () => {
       await doSubscribe();
-      setShowIosButton(false);
+      setShowButton(false);
     };
 
-    const attachFirstTapListener = () => {
+    const attachFirstTapHandler = () => {
       if (cleanup) return;
       const onFirstTap = () => {
         detach();
         Notification.requestPermission()
           .then((perm) => {
             if (perm === 'granted') return subscribeAndDone();
-            setShowIosButton(false);
+            setShowButton(false);
             return undefined;
           })
           .catch(() => {
-            setShowIosButton(false);
+            setShowButton(false);
             return undefined;
           });
       };
@@ -108,18 +94,20 @@ export function PushSubscribe() {
       }
       if (Notification.permission === 'denied') return;
 
-      // Non-Apple engines permit a load-time prompt without a gesture.
-      if (!isIosDevice()) {
-        try {
-          const perm = await Notification.requestPermission();
-          if (perm === 'granted') {
-            await subscribeAndDone();
-          } else {
-            attachFirstTapListener();
-          }
-        } catch {
-          attachFirstTapListener();
+      // Try auto-prompt; on iOS this will fail but Safari doesn't throw.
+      // If permission remains default, attach first-tap handler.
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          await subscribeAndDone();
+        } else if (perm === 'default') {
+          attachFirstTapHandler();
+        } else {
+          setShowButton(false);
         }
+      } catch {
+        // Permission request threw or silently failed (likely iOS)
+        // Button stays visible; first tap will trigger it
       }
     };
 
@@ -127,7 +115,7 @@ export function PushSubscribe() {
     return () => detach();
   }, []);
 
-  if (!showIosButton) return null;
+  if (!showButton) return null;
 
   return (
     <div
@@ -151,10 +139,10 @@ export function PushSubscribe() {
         Notification.requestPermission()
           .then((perm) => {
             if (perm === 'granted') return subscribeAndDone();
-            setShowIosButton(false);
+            setShowButton(false);
             return undefined;
           })
-          .catch(() => setShowIosButton(false));
+          .catch(() => setShowButton(false));
       }}
     >
       Get notified of new deals
