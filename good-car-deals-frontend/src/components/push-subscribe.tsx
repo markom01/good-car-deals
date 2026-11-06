@@ -19,6 +19,25 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return bytes;
 }
 
+async function doSubscribe(): Promise<void> {
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(
+      VAPID_PUBLIC_KEY,
+    ) as unknown as BufferSource,
+  });
+
+  const res = await fetch(`${API_URL}/push/subscribe`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(subscription),
+  });
+  if (!res.ok) {
+    console.error('Push subscribe failed:', res.status);
+  }
+}
+
 /**
  * iPadOS reports a desktop Mac user agent, so the plain UA test misses it.
  * `maxTouchPoints > 1` on a Mac UA is the established iPadOS tell.
@@ -35,12 +54,9 @@ function isIosDevice(): boolean {
  * invisible on Chrome/Android/Firefox, where the notification prompt is
  * requested automatically on mount (no UI). iOS Safari/WebKit refuses
  * requestPermission() outside a user gesture, so iOS devices get the floating
- * "Get notified" button back — tapping it is the gesture WebKit requires and
- * clicking it requests permission synchronously (any preceding await would
- * consume the gesture). Once permission is granted, subscribe() needs no
- * gesture, so a granted-but-unsubscribed device resubscribes silently
- * re-enabled on mount. Engines that reject the mount-time prompt without
- * being iOS (macOS Safari) fall back to requesting on the first tap.
+ * "Get notified" button back — tapping it is the gesture WebKit requires.
+ * Once permission is granted, subscribe() needs no gesture, so a granted-but-
+ * unsubscribed device resubscribes silently on mount.
  */
 export function PushSubscribe() {
   const [showIosButton, setShowIosButton] = useState(false);
@@ -56,32 +72,13 @@ export function PushSubscribe() {
       cleanup = undefined;
     };
 
-    const subscribe = async () => {
-      const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(
-          VAPID_PUBLIC_KEY,
-        ) as unknown as BufferSource,
-      });
-
-      const res = await fetch(`${API_URL}/push/subscribe`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(subscription),
-      });
-      if (!res.ok) {
-        console.error('Push subscribe failed:', res.status);
-      }
-    };
-
     const attachFirstTapListener = () => {
       if (cleanup) return;
       const onFirstTap = () => {
         detach();
         Notification.requestPermission()
           .then((perm) => {
-            if (perm === 'granted') return subscribe();
+            if (perm === 'granted') return doSubscribe();
             return undefined;
           })
           .catch(() => undefined);
@@ -96,7 +93,7 @@ export function PushSubscribe() {
       if (await registration.pushManager.getSubscription()) return;
 
       if (Notification.permission === 'granted') {
-        await subscribe();
+        await doSubscribe();
         return;
       }
       if (Notification.permission === 'denied') return;
@@ -110,7 +107,7 @@ export function PushSubscribe() {
       try {
         const perm = await Notification.requestPermission();
         if (perm === 'granted') {
-          await subscribe();
+          await doSubscribe();
         } else {
           attachFirstTapListener();
         }
@@ -143,10 +140,9 @@ export function PushSubscribe() {
         cursor: 'pointer',
       }}
       onClick={() => {
-        // Must be the first await-free statement of the gesture handler.
         Notification.requestPermission()
           .then((perm) => {
-            if (perm === 'granted') return subscribe();
+            if (perm === 'granted') return doSubscribe();
             return undefined;
           })
           .catch(() => undefined)
