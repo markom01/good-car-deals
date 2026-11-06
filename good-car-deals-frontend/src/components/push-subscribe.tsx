@@ -39,13 +39,12 @@ async function doSubscribe(): Promise<void> {
 }
 
 /**
- * Push bootstrap with platform-differentiated prompting.
- * iOS Safari/WebKit refuses requestPermission() outside a user gesture,
- * so iOS devices always get the floating "Get notified" button.
- * Chrome/Android/Firefox/macOS request permission automatically; button stays hidden.
+ * Push bootstrap with platform-optimized prompting.
+ * - Chrome/Android/Firefox/macOS: auto-prompt on mount, button hidden after
+ * - iOS Safari/Home Screen PWA: button visible, tap triggers prompt (gesture required)
  */
 export function PushSubscribe() {
-  // State determines if button should be visible
+  // Start with button visible; hide only after grant or when we know auto-prompt worked
   const [showButton, setShowButton] = useState(true);
 
   useEffect(() => {
@@ -53,67 +52,83 @@ export function PushSubscribe() {
       return;
     }
 
-    let cleanup: (() => void) | undefined;
+    let clickHandler: (() => void) | undefined;
+
     const detach = () => {
-      cleanup?.();
-      cleanup = undefined;
+      if (clickHandler) {
+        document.removeEventListener('click', clickHandler, true);
+        clickHandler = undefined;
+      }
     };
 
-    const subscribeAndDone = async () => {
+    const doSubscribeAndSetDismiss = async () => {
       await doSubscribe();
       setShowButton(false);
     };
 
-    const attachFirstTapHandler = () => {
-      if (cleanup) return;
-      const onFirstTap = () => {
+    const tryAutoPrompt = async () => {
+      if (Notification.permission === 'granted') {
+        await doSubscribeAndSetDismiss();
+        return;
+      }
+      if (Notification.permission === 'denied') {
+        // Already denied, keep button hidden (or don't show it)
+        setShowButton(false);
+        return;
+      }
+
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm === 'granted') {
+          await doSubscribeAndSetDismiss();
+        } else if (perm === 'denied') {
+          setShowButton(false);
+        }
+        // If perm === 'default', button stays visible; user must tap
+      } catch {
+        // Permission request failed; button stays for tap handler
+      }
+    };
+
+    const startTapHandler = () => {
+      // On the first tap, try requesting permission (valid gesture context)
+      clickHandler = () => {
         detach();
         Notification.requestPermission()
           .then((perm) => {
-            if (perm === 'granted') return subscribeAndDone();
+            if (perm === 'granted') {
+              return doSubscribeAndSetDismiss();
+            }
+            // Denied or default - hide button, user may retry later
             setShowButton(false);
             return undefined;
           })
-          .catch(() => {
-            setShowButton(false);
-            return undefined;
-          });
+          .catch(() => setShowButton(false));
       };
-      document.addEventListener('click', onFirstTap, true);
-      cleanup = () => document.removeEventListener('click', onFirstTap, true);
+      document.addEventListener('click', clickHandler, true);
     };
 
     const run = async () => {
       await navigator.serviceWorker.register('/sw.js', { scope: '/' });
       const registration = await navigator.serviceWorker.ready;
-      if (await registration.pushManager.getSubscription()) return;
 
-      if (Notification.permission === 'granted') {
-        await subscribeAndDone();
+      // Already subscribed - dismiss button
+      if (await registration.pushManager.getSubscription()) {
+        setShowButton(false);
         return;
       }
-      if (Notification.permission === 'denied') return;
 
-      // Try auto-prompt; on iOS this will fail but Safari doesn't throw.
-      // If permission remains default, attach first-tap handler.
-      try {
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-          await subscribeAndDone();
-        } else if (perm === 'default') {
-          attachFirstTapHandler();
-        } else {
-          setShowButton(false);
-        }
-      } catch {
-        // Permission request threw or silently failed (likely iOS)
-        // Button stays visible; first tap will trigger it
+      await tryAutoPrompt();
+
+      // If button still visible and permission is 'default', we need a tap
+      if (showButton && Notification.permission === 'default') {
+        startTapHandler();
       }
     };
 
     run().catch((err) => console.error('Push setup failed:', err));
-    return () => detach();
-  }, []);
+    return detach;
+  }, [showButton]);
 
   if (!showButton) return null;
 
