@@ -21,7 +21,7 @@ self.addEventListener('push', (event) => {
     data = {};
   }
   const details = [];
-  if (data.price) details.push(`€${data.price}`);
+  details.push(`€${data.price != null ? data.price : '—'}`);
   if (typeof data.dealScore === 'number') {
     details.push(`Score ${data.dealScore}/100`);
   }
