@@ -142,6 +142,8 @@ describe('DealWatcherService.poll', () => {
     const payload = pushService.notifyNewAd.mock.calls[0][0];
     expect(payload.id).toBe('301');
     expect(typeof payload.id).toBe('string');
+    expect(payload.dealScore).toBe(100);
+    expect(payload.deviationPct).toBe(5);
     expect(payload.link).toBe('.../301/opel-astra-16-cdti');
     expect(prisma.seenPolovniAd.createMany).toHaveBeenCalledTimes(1);
     expect(prisma.seenPolovniAd.createMany.mock.calls[0][0].data).toEqual([

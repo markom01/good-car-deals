@@ -20,10 +20,23 @@ self.addEventListener('push', (event) => {
   } catch {
     data = {};
   }
+  const details = [];
+  if (data.price) details.push(`€${data.price}`);
+  if (typeof data.dealScore === 'number') {
+    details.push(`Score ${data.dealScore}/100`);
+  }
+  if (typeof data.deviationPct === 'number') {
+    const pct = Math.round(Math.abs(data.deviationPct));
+    const direction =
+      data.deviationPct > 0
+        ? 'below typical'
+        : data.deviationPct < 0
+          ? 'above typical'
+          : 'at typical';
+    details.push(`${pct}% ${direction}`);
+  }
   const options = {
-    body: data.price
-      ? `${data.title} — €${data.price}`
-      : data.title || 'New car listing',
+    body: details.join(' · '),
     tag: data.id || 'new-ad',
     badge: '/wheelrank-logo.svg',
     icon: '/wheelrank-logo.svg',

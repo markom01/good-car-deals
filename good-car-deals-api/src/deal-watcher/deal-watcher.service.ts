@@ -135,6 +135,8 @@ export class DealWatcherService implements OnModuleInit, OnModuleDestroy {
           title: ad.raw.title,
           price:
             listing.priceNumeric === null ? null : String(listing.priceNumeric),
+          dealScore: result.dealScore,
+          deviationPct: result.deviationPct,
           published: ad.indexedAt,
           link: listing.listingUrl,
         });

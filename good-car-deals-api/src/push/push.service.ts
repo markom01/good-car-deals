@@ -14,6 +14,8 @@ interface NewAdPayload {
   id: string;
   title: string;
   price: string | null;
+  dealScore: number | null;
+  deviationPct: number | null;
   published: string | null;
   link: string | null;
   ts: number;
@@ -89,6 +91,8 @@ export class PushService implements OnModuleInit {
     id: string;
     title: string;
     price: string | null;
+    dealScore?: number | null;
+    deviationPct?: number | null;
     published: string | null;
     link: string | null;
   }): Promise<void> {
@@ -100,6 +104,8 @@ export class PushService implements OnModuleInit {
       id: ad.id,
       title: ad.title,
       price: ad.price,
+      dealScore: ad.dealScore ?? null,
+      deviationPct: ad.deviationPct ?? null,
       published: ad.published,
       link: ad.link,
       ts: Date.now(),
